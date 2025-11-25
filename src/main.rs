@@ -1,6 +1,11 @@
 use glium::*;
-
+use glium::winit::keyboard::{KeyCode, PhysicalKey};
+pub mod shader;
 fn main() {
+    // 定义着色器的路径
+    let vertex_path = "assets/shaders/vertex.vert";
+    let fragment_path = "assets/shaders/fragment.frag";
+    
     // 启动
     let event_loop = glium::winit::event_loop::EventLoop::builder()
         .build()
@@ -47,31 +52,8 @@ fn main() {
     )
     .unwrap();
 
-    // 编译着色器
-    let vertex_shader_src = r#"
-           #version 140
-
-           in vec2 position;
-           out vec2 f_position;
-           void main() {
-               gl_Position = vec4(position, 0.0, 1.0);
-               f_position = position;
-           }
-       "#;
-
-    let fragment_shader_src = r#"
-           #version 140
-           in vec2 f_position;
-           out vec4 color;
-
-           void main() {
-               color = vec4(f_position * 0.5 + 0.5, f_position.x * f_position.y + 0.5, 1.0);
-           }
-       "#;
-
-    let program =
-        glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None)
-            .unwrap();
+    // 通过调用 shader库中的 create_shader 函数来创建着色器程序
+    let program = shader::create_shader(&display,vertex_path,fragment_path);
 
     #[allow(deprecated)]
     event_loop
@@ -80,6 +62,19 @@ fn main() {
                 glium::winit::event::WindowEvent::CloseRequested => {
                     // 请求关闭
                     window_target.exit();
+                }
+                glium::winit::event::WindowEvent::KeyboardInput {event: key_event, ..} => {
+                    if key_event.physical_key == PhysicalKey::Code(KeyCode::Escape) {
+                        window_target.exit();
+                    } else if key_event.physical_key == PhysicalKey::Code(KeyCode::KeyW) {
+                        println!("key-W pressed");
+                    } else if key_event.physical_key == PhysicalKey::Code(KeyCode::KeyA) {
+                        println!("key-A pressed");
+                    } else if key_event.physical_key == PhysicalKey::Code(KeyCode::KeyS) {
+                        println!("key-S pressed");
+                    } else if key_event.physical_key == PhysicalKey::Code(KeyCode::KeyD) {
+                        println!("key-D pressed");
+                    }
                 }
                 glium::winit::event::WindowEvent::RedrawRequested => {
                     // 请求重绘
