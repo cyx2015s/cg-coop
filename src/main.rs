@@ -1,11 +1,11 @@
-use glium::*;
 use glium::winit::keyboard::{KeyCode, PhysicalKey};
+use glium::*;
 pub mod shader;
 fn main() {
     // 定义着色器的路径
     let vertex_path = "assets/shaders/vertex.vert";
     let fragment_path = "assets/shaders/fragment.frag";
-    
+
     // 启动
     let event_loop = glium::winit::event_loop::EventLoop::builder()
         .build()
@@ -53,7 +53,7 @@ fn main() {
     .unwrap();
 
     // 通过调用 shader库中的 create_shader 函数来创建着色器程序
-    let program = shader::create_shader(&display,vertex_path,fragment_path);
+    let program = shader::create_shader(&display, vertex_path, fragment_path);
 
     #[allow(deprecated)]
     event_loop
@@ -63,7 +63,9 @@ fn main() {
                     // 请求关闭
                     window_target.exit();
                 }
-                glium::winit::event::WindowEvent::KeyboardInput {event: key_event, ..} => {
+                glium::winit::event::WindowEvent::KeyboardInput {
+                    event: key_event, ..
+                } => {
                     if key_event.physical_key == PhysicalKey::Code(KeyCode::Escape) {
                         window_target.exit();
                     } else if key_event.physical_key == PhysicalKey::Code(KeyCode::KeyW) {
