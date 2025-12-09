@@ -144,43 +144,46 @@ fn main() {
                                 &params).unwrap();
                     target.finish().unwrap();
                 }
+                winit::event::WindowEvent::CloseRequested => {
+                    window_target.exit();
+                }
                 _ => (),
             },
             glium::winit::event::Event::AboutToWait => {
-                            let current_time = Instant::now();
-            let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
-            last_frame_time = current_time;
-            // 使用 delta_time 确保移动速度与帧率无关
-            let move_speed = 3.0; // 单位/秒
-            let move_distance = move_speed * delta_time;
-            let mut moved = false;
-            if input_state.is_keycode_pressed(KeyCode::KeyW) {
-                camera.transform.position += camera.transform.get_forward() * move_distance;
-                moved = true;
-            }
-            if input_state.is_keycode_pressed(KeyCode::KeyS) {
-                camera.transform.position += -camera.transform.get_forward() * move_distance;
-                moved = true;
-            }
-            if input_state.is_keycode_pressed(KeyCode::KeyA) {
-                camera.transform.position += -camera.transform.get_right() * move_distance;
-                moved = true;
-            }
-            if input_state.is_keycode_pressed(KeyCode::KeyD) {
-                camera.transform.position += camera.transform.get_right() * move_distance;
-                moved = true;
-            }
-            if input_state.is_keycode_pressed(KeyCode::ControlLeft) {
-                camera.transform.position += -glam::f32::Vec3::Y * move_distance;
-                moved = true;
-            }
-            if input_state.is_keycode_pressed(KeyCode::Space) {
-                camera.transform.position += glam::f32::Vec3::Y * move_distance;
-                moved = true;
-            }
-            if moved || true { // 总是重绘以保持流畅
-                _window.request_redraw();
-            }
+                let current_time = Instant::now();
+                let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
+                last_frame_time = current_time;
+                // 使用 delta_time 确保移动速度与帧率无关
+                let move_speed = 3.0; // 单位/秒
+                let move_distance = move_speed * delta_time;
+                let mut moved = false;
+                if input_state.is_keycode_pressed(KeyCode::KeyW) {
+                    camera.transform.position += camera.transform.get_forward() * move_distance;
+                    moved = true;
+                }
+                if input_state.is_keycode_pressed(KeyCode::KeyS) {
+                    camera.transform.position += -camera.transform.get_forward() * move_distance;
+                    moved = true;
+                }
+                if input_state.is_keycode_pressed(KeyCode::KeyA) {
+                    camera.transform.position += -camera.transform.get_right() * move_distance;
+                    moved = true;
+                }
+                if input_state.is_keycode_pressed(KeyCode::KeyD) {
+                    camera.transform.position += camera.transform.get_right() * move_distance;
+                    moved = true;
+                }
+                if input_state.is_keycode_pressed(KeyCode::ControlLeft) {
+                    camera.transform.position += -glam::f32::Vec3::Y * move_distance;
+                    moved = true;
+                }
+                if input_state.is_keycode_pressed(KeyCode::Space) {
+                    camera.transform.position += glam::f32::Vec3::Y * move_distance;
+                    moved = true;
+                }
+                if moved || true { // 总是重绘以保持流畅
+                    _window.request_redraw();
+                }
             },
             _ => (),
         })
