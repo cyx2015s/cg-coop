@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 glium = "0.36.0"
 glam = "0.30.9"
+gltf = "1.4.1"
