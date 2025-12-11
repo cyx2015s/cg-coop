@@ -3,6 +3,7 @@ use cg_coop::base::keystate::InputState;
 use cg_coop::base::mouse;
 use cg_coop::camera;
 use cg_coop::shader;
+use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
 use std::time::Instant;
@@ -19,9 +20,19 @@ fn main() {
     let event_loop = glium::winit::event_loop::EventLoop::builder()
         .build()
         .unwrap();
-    let (_window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
+    let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
         .with_title("Project")
         .build(&event_loop);
+
+    let mut ui_ctx = imgui::Context::create();
+    let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
+    let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
+
+    ui_platform.attach_window(
+        ui_ctx.io_mut(),
+        &window,
+        imgui_winit_support::HiDpiMode::Locked(2.0),
+    );
 
     let positions = glium::VertexBuffer::new(&display, &cube::VERTICES).unwrap();
     let normals = glium::VertexBuffer::new(&display, &cube::NORMALS).unwrap();
@@ -81,45 +92,50 @@ fn main() {
     let program = shader::create_shader(&display, vertex_path, fragment_path);
     #[allow(deprecated)]
     event_loop
-        .run(move |ev, window_target| match ev {
-            glium::winit::event::Event::DeviceEvent { event, .. } => {
+        .run(move |ev, window_target| {
+            // println!("{:?}", &ev);
+            ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
+            match ev {
+            Event::DeviceEvent { event, .. } => {
                 match event {
-                    glium::winit::event::DeviceEvent::MouseMotion { delta } => {
+                    DeviceEvent::MouseMotion { delta } => {
                         if mouse_state.is_locked {
                             let (dx, dy) = delta;
                             mouse_state.delta = (dx as f32, dy as f32);
                             // 应用相机旋转
                             camera.rotate(-mouse_state.delta.0 * mouse_state.sensitivity, -mouse_state.delta.1 * mouse_state.sensitivity);
-                           _window.request_redraw();
+                           window.request_redraw();
                         }
                     }
                     _ => {}
                 }
             }
-            glium::winit::event::Event::WindowEvent { event, .. } => match event {
-                glium::winit::event::WindowEvent::KeyboardInput {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput {
                     event: key_event, ..
                 } => {
                     match key_event.state {
-                        glium::winit::event::ElementState::Pressed => {
+                        ElementState::Pressed => {
                             input_state.set_key_pressed(key_event.physical_key);
                             // 立即响应的按键（如退出）
                             if key_event.physical_key == KeyCode::Escape {
                                 window_target.exit();
                             }
                         }
-                        glium::winit::event::ElementState::Released => {
+                        ElementState::Released => {
                             input_state.set_key_released(key_event.physical_key);
                             // 只在释放时触发的按键
                             if key_event.physical_key == KeyCode::KeyV {
-                                mouse_state.toggle_lock(&_window);
+                                mouse_state.toggle_lock(&window);
                             }
                         }
                     }
                 }
-                glium::winit::event::WindowEvent::RedrawRequested => {
+                WindowEvent::RedrawRequested => {
                     // 请求重绘
                     let mut target = display.draw();
+                    let ui = ui_ctx.frame();
+                    ui.show_demo_window(&mut true);
                     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
                     let model = [
                         [0.5, 0.0, 0.0, 0.0],
@@ -142,6 +158,10 @@ fn main() {
                     target.draw((&positions, &normals), &indices, &program,
                                 &uniform! { model: model, view: view, perspective: perspective, u_light: light },
                                 &params).unwrap();
+                    let draw_data = ui_ctx.render();
+                    if (draw_data.draw_lists_count() > 0){
+                        ui_renderer.render(&mut target, &draw_data);
+                    }
                     target.finish().unwrap();
                 }
                 winit::event::WindowEvent::CloseRequested => {
@@ -149,7 +169,7 @@ fn main() {
                 }
                 _ => (),
             },
-            glium::winit::event::Event::AboutToWait => {
+            Event::AboutToWait => {
                 let current_time = Instant::now();
                 let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
                 last_frame_time = current_time;
@@ -182,10 +202,10 @@ fn main() {
                     moved = true;
                 }
                 if moved || true { // 总是重绘以保持流畅
-                    _window.request_redraw();
+                    window.request_redraw();
                 }
             },
             _ => (),
-        })
+        }})
         .unwrap();
 }
