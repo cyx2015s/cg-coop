@@ -15,7 +15,9 @@ fn main() {
     // 定义着色器的路径
     let vertex_path = "assets/shaders/3d_vertex.vert";
     let fragment_path = "assets/shaders/3d_fragment.frag";
-
+    let global_ctx = cg_coop::ctx::GlobalContext {
+        ui_ctx: imgui::Context::create(),
+    };
     // 启动
     let event_loop = glium::winit::event_loop::EventLoop::builder()
         .build()
@@ -24,7 +26,7 @@ fn main() {
         .with_title("Project")
         .build(&event_loop);
 
-    let mut ui_ctx = imgui::Context::create();
+    let mut ui_ctx = global_ctx.ui_ctx;
     let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
     let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
 
@@ -159,8 +161,8 @@ fn main() {
                                 &uniform! { model: model, view: view, perspective: perspective, u_light: light },
                                 &params).unwrap();
                     let draw_data = ui_ctx.render();
-                    if (draw_data.draw_lists_count() > 0){
-                        ui_renderer.render(&mut target, &draw_data);
+                    if draw_data.draw_lists_count() > 0 {
+                        ui_renderer.render(&mut target, &draw_data).unwrap();
                     }
                     target.finish().unwrap();
                 }
