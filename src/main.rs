@@ -44,9 +44,10 @@ fn main() {
     // 定义时间戳
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
+    let mut ui_last_frame_time = Instant::now();
     // 定义着色器的路径
-    let vertex_path = "assets/shaders/lambert.vert";
-    let fragment_path = "assets/shaders/lambert.frag";
+    let vertex_path = "../assets/shaders/lambert.vert";
+    let fragment_path = "../assets/shaders/lambert.frag";
     let global_ctx = cg_coop::ctx::GlobalContext {
         ui_ctx: imgui::Context::create(),
     };
