@@ -8,6 +8,10 @@ use cg_coop::base::light::{DirectionalLight, PointLight, SpotLight, AmbientLight
 use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
+use imgui::Condition;
+use imgui::FontConfig;
+use imgui::FontGlyphRanges;
+use imgui::FontSource;
 use std::time::Instant;
 
 fn _print_type<T>(_: &T) {
@@ -40,13 +44,13 @@ fn main() {
     // 定义时间戳
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
-
     // 定义着色器的路径
     let vertex_path = "assets/shaders/lambert.vert";
     let fragment_path = "assets/shaders/lambert.frag";
     let global_ctx = cg_coop::ctx::GlobalContext {
         ui_ctx: imgui::Context::create(),
     };
+
     // 启动
     let event_loop = winit::event_loop::EventLoop::builder()
         .build()
@@ -59,10 +63,23 @@ fn main() {
     let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
     let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
 
+    // Font
+    let cn_font = ui_ctx.fonts().add_font(&[FontSource::TtfData {
+        data: include_bytes!("../assets/fonts/font.ttf"),
+        size_pixels: 32.0,
+        config: Some(FontConfig {
+            glyph_ranges: FontGlyphRanges::chinese_simplified_common(),
+            ..Default::default()
+        }),
+    }]);
+    ui_renderer
+        .reload_font_texture(&mut ui_ctx)
+        .expect("字体加载失败");
+
     ui_platform.attach_window(
         ui_ctx.io_mut(),
         &window,
-        imgui_winit_support::HiDpiMode::Locked(2.0),
+        imgui_winit_support::HiDpiMode::Locked(1.0),
     );
 
     let positions = glium::VertexBuffer::new(&display, &cube::VERTICES).unwrap();
@@ -165,8 +182,24 @@ fn main() {
                 WindowEvent::RedrawRequested => {
                     // 请求重绘
                     let mut target = display.draw();
+                    ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
+                    ui_last_frame_time = Instant::now();
                     let ui = ui_ctx.frame();
+                    let _cn_font = ui.push_font(cn_font);
                     ui.show_demo_window(&mut true);
+                    ui.window("Hello world")
+                        .size([300.0, 100.0], Condition::FirstUseEver)
+                        .build(|| {
+                            ui.text("Hello world!");
+                            ui.text("你好世界！");
+                            ui.text("This...is...imgui-rs!");
+                            ui.separator();
+                            let mouse_pos = ui.io().mouse_pos;
+                            ui.text(format!(
+                                "Mouse Position: ({:.1},{:.1})",
+                                mouse_pos[0], mouse_pos[1]
+                            ));
+                        });
                     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
                     let model = [
                         [0.5, 0.0, 0.0, 0.0],
@@ -195,6 +228,7 @@ fn main() {
                                 spot_light: spot_light.get_mat4_data(),
                                 },
                                 &params).unwrap();
+                    _cn_font.pop();
                     let draw_data = ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {
                         ui_renderer.render(&mut target, &draw_data).unwrap();
