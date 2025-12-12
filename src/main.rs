@@ -12,6 +12,7 @@ use imgui::Condition;
 use imgui::FontConfig;
 use imgui::FontGlyphRanges;
 use imgui::FontSource;
+use imgui::InputTextFlags;
 use std::time::Instant;
 
 fn _print_type<T>(_: &T) {
@@ -247,6 +248,23 @@ fn main() {
                                 mouse_pos[0], mouse_pos[1]
                             ));
                         });
+                    ui.window("灯光与材质测试").size([400.0, 200.0], Condition::FirstUseEver).build(|| {
+                        
+                        ui.slider("环境光强度", 0.0, 1.0, &mut ambient_light.intensity);
+                        ui.slider("平行光强度", 0.0, 5.0, &mut directional_light.intensity);
+                        ui.slider("点光源强度", 0.0, 50.0, &mut point_light.intensity);
+                        ui.slider("聚光灯强度", 0.0, 100.0, &mut spot_light.intensity);
+                        ui.separator();
+                        ui.input_float3("平行光方向", &mut directional_light.direction).build();
+                        ui.color_edit3("平行光颜色", &mut directional_light.color);
+                        ui.separator();
+                        ui.input_float3("点光源位置", &mut point_light.position).build();
+                        ui.color_edit3("点光源颜色", &mut point_light.color);
+                        ui.separator();
+                        ui.color_edit3("材质 ka", &mut lambertian.ka);
+                        ui.color_edit3("材质 kd", &mut lambertian.kd);
+                        
+                    });
                     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
                     let model = [
                         [0.5, 0.0, 0.0, 0.0],
