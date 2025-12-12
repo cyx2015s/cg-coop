@@ -3,23 +3,52 @@ use cg_coop::base::keystate::InputState;
 use cg_coop::base::mouse;
 use cg_coop::camera;
 use cg_coop::shader;
+use cg_coop::base::material::*;
+use cg_coop::base::light::{DirectionalLight, PointLight, SpotLight, AmbientLight};
 use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
 use std::time::Instant;
 
+fn _print_type<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>());
+}
 fn main() {
+    // 定义灯光和材质
+    let mut lambertian = Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
+    let mut ambient_light = AmbientLight::new(0.0);
+    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 0.0, [1.0, 1.0, 1.0]);
+    let mut point_light = PointLight {
+        position: [2.0, 2.0, 2.0],
+        intensity: 0.0,
+        color: [1.0, 1.0, 1.0],
+        kc: 1.0,
+        kl: 0.09,
+        kq: 0.032,
+    };
+    let mut spot_light = SpotLight {
+        position: [0.0, 5.0, 0.0],
+        direction: [0.0, -1.0, 0.0],
+        intensity: 10.0,
+        color: [1.0, 1.0, 1.0],
+        angle: 30.0,
+        kc: 1.0,
+        kl: 0.09,
+        kq: 10.2,
+    };
+
     // 定义时间戳
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
+
     // 定义着色器的路径
-    let vertex_path = "assets/shaders/3d_vertex.vert";
-    let fragment_path = "assets/shaders/3d_fragment.frag";
+    let vertex_path = "assets/shaders/lambert.vert";
+    let fragment_path = "assets/shaders/lambert.frag";
     let global_ctx = cg_coop::ctx::GlobalContext {
         ui_ctx: imgui::Context::create(),
     };
     // 启动
-    let event_loop = glium::winit::event_loop::EventLoop::builder()
+    let event_loop = winit::event_loop::EventLoop::builder()
         .build()
         .unwrap();
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
@@ -147,7 +176,6 @@ fn main() {
                     ];
                     let view = camera.get_view_matrix();
                     let perspective = camera.get_projection_matrix();
-                    let light = [-1.0, 0.4, 0.9f32];
                     let params = glium::DrawParameters {
                         depth: glium::Depth {
                             test: glium::draw_parameters::DepthTest::IfLess,
@@ -157,8 +185,15 @@ fn main() {
                         //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
                         .. Default::default()
                     };
+                    let light = [-1.0, 0.4, 0.9f32];
                     target.draw((&positions, &normals), &indices, &program,
-                                &uniform! { model: model, view: view, perspective: perspective, u_light: light },
+                                &uniform! { model: model, view: view, perspective: perspective,
+                                material: lambertian.get_mat3_data(),
+                                ambient_light: ambient_light.get_mat4_data(),
+                                directional_light: directional_light.get_mat4_data(),
+                                point_light: point_light.get_mat4_data(),
+                                spot_light: spot_light.get_mat4_data(),
+                                },
                                 &params).unwrap();
                     let draw_data = ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {

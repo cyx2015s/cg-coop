@@ -1,3 +1,4 @@
+
 pub struct Transform {
     pub position: glam::f32::Vec3,
     pub rotation: glam::f32::Quat,
@@ -5,12 +6,16 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn new() -> Self {
+    pub fn new(position : glam::f32::Vec3, rotation: glam::f32::Quat, scale: glam::f32::Vec3 ) -> Self {
         Self {
-            position: glam::f32::Vec3::ZERO,
-            rotation: glam::f32::Quat::IDENTITY,
-            scale: glam::f32::Vec3::ONE,
+            position,
+            rotation,
+            scale,
         }
+    }
+
+    pub fn default() -> Self {
+        Transform::new(glam::f32::Vec3::ZERO, glam::f32::Quat::IDENTITY, glam::f32::Vec3::ONE)
     }
 
     pub fn look_at(&mut self, target: glam::f32::Vec3, up: glam::f32::Vec3) {

@@ -10,7 +10,7 @@ pub struct Camera {
 impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
-            transform: transform::Transform::new(),
+            transform: transform::Transform::default(),
             fovy: 3.141592 / 3.0,
             aspect: aspect,
             znear: 0.1,
@@ -30,7 +30,7 @@ impl Camera {
         let view_matrix = glam::f32::Mat4::look_to_rh(
             self.transform.position,      // 相机位置
             self.transform.get_forward(), // 目标点（相机位置 + 前向方向）
-            self.transform.get_up(),      // 上方向
+            glam::f32::Vec3::Y,      // 上方向
         )
         .to_cols_array_2d();
         view_matrix
