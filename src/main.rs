@@ -5,7 +5,7 @@ use cg_coop::camera;
 use cg_coop::shader;
 use cg_coop::base::material::*;
 use cg_coop::base::light::{DirectionalLight, PointLight, SpotLight, AmbientLight};
-use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
+use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent, };
 use glium::winit::keyboard::KeyCode;
 use glium::*;
 use imgui::Condition;
@@ -20,8 +20,8 @@ fn _print_type<T>(_: &T) {
 fn main() {
     // 定义灯光和材质
     let mut lambertian = Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
-    let mut ambient_light = AmbientLight::new(0.0);
-    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 0.0, [1.0, 1.0, 1.0]);
+    let mut ambient_light = AmbientLight::new(0.2);
+    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
         position: [2.0, 2.0, 2.0],
         intensity: 0.0,
@@ -62,7 +62,7 @@ fn main() {
     let mut ui_ctx = global_ctx.ui_ctx;
     let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
     let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
-
+    let mut ui_last_frame_time = Instant::now();
     // Font
     let cn_font = ui_ctx.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../assets/fonts/font.ttf"),
@@ -154,7 +154,23 @@ fn main() {
                             camera.rotate(-mouse_state.delta.0 * mouse_state.sensitivity, -mouse_state.delta.1 * mouse_state.sensitivity);
                            window.request_redraw();
                         }
-                    }
+                    },
+                    DeviceEvent::MouseWheel { delta } => {
+                        let scroll = match delta {
+                            glium::winit::event::MouseScrollDelta::LineDelta(_, y) => y * 50.0,  // 每行当 50 像素
+                            glium::winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
+                        };
+
+                        // exp 缩放 —— 最推荐的相机缩放方式
+                        let zoom_sensitivity = 0.005; // 你可以调高调低
+
+                        camera.fovy *= f32::exp(-scroll * zoom_sensitivity);
+
+                        // 限制 FOV（单位：弧度）
+                        camera.fovy = camera.fovy.clamp(0.05, 1.5);
+                        window.request_redraw();
+                    },
+
                     _ => {}
                 }
             }
@@ -174,7 +190,30 @@ fn main() {
                             input_state.set_key_released(key_event.physical_key);
                             // 只在释放时触发的按键
                             if key_event.physical_key == KeyCode::KeyV {
+                                if camera.move_state == camera::MoveState::Free {
+                                    camera.move_state = camera::MoveState::Locked;
+                                } else {
+                                    camera.move_state = camera::MoveState::Free;
+                                }
                                 mouse_state.toggle_lock(&window);
+
+                            }
+                            if key_event.physical_key == KeyCode::KeyB {
+                                if camera.move_state == camera::MoveState::PanObit {
+                                    camera.stop_pan_obit();
+                                } else {
+                                    camera.start_pan_obit(0.0, 5.0, [0.5, 0.5, 0.5]);
+                                    camera.pan_obit_speed = 10.0;
+                                }
+                            }
+                            if key_event.physical_key == KeyCode::KeyR {
+                                camera.fovy = 3.141592 / 2.0;
+                            }
+                            if key_event.physical_key == KeyCode::KeyP { 
+                                let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
+                                let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
+                                let image = image::DynamicImage::ImageRgba8(image).flipv();
+                                image.save("screenshot.png").unwrap();
                             }
                         }
                     }
@@ -183,7 +222,14 @@ fn main() {
                     // 请求重绘
                     let mut target = display.draw();
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
+                    if camera.move_state == camera::MoveState::PanObit {
+                        let current_time = Instant::now();
+                        let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
+                        last_frame_time = current_time;
+                        camera.update_pan_obit(delta_time);
+                    }
                     ui_last_frame_time = Instant::now();
+                    
                     let ui = ui_ctx.frame();
                     let _cn_font = ui.push_font(cn_font);
                     ui.show_demo_window(&mut true);
@@ -248,29 +294,31 @@ fn main() {
                 let move_speed = 3.0; // 单位/秒
                 let move_distance = move_speed * delta_time;
                 let mut moved = false;
-                if input_state.is_keycode_pressed(KeyCode::KeyW) {
-                    camera.transform.position += camera.transform.get_forward() * move_distance;
-                    moved = true;
-                }
-                if input_state.is_keycode_pressed(KeyCode::KeyS) {
-                    camera.transform.position += -camera.transform.get_forward() * move_distance;
-                    moved = true;
-                }
-                if input_state.is_keycode_pressed(KeyCode::KeyA) {
-                    camera.transform.position += -camera.transform.get_right() * move_distance;
-                    moved = true;
-                }
-                if input_state.is_keycode_pressed(KeyCode::KeyD) {
-                    camera.transform.position += camera.transform.get_right() * move_distance;
-                    moved = true;
-                }
-                if input_state.is_keycode_pressed(KeyCode::ControlLeft) {
-                    camera.transform.position += -glam::f32::Vec3::Y * move_distance;
-                    moved = true;
-                }
-                if input_state.is_keycode_pressed(KeyCode::Space) {
-                    camera.transform.position += glam::f32::Vec3::Y * move_distance;
-                    moved = true;
+                if camera.move_state == camera::MoveState::Free {
+                    if input_state.is_keycode_pressed(KeyCode::KeyW) {
+                        camera.transform.position += camera.transform.get_forward() * move_distance;
+                        moved = true;
+                    }
+                    if input_state.is_keycode_pressed(KeyCode::KeyS) {
+                        camera.transform.position += -camera.transform.get_forward() * move_distance;
+                        moved = true;
+                    }
+                    if input_state.is_keycode_pressed(KeyCode::KeyA) {
+                        camera.transform.position += -camera.transform.get_right() * move_distance;
+                        moved = true;
+                    }
+                    if input_state.is_keycode_pressed(KeyCode::KeyD) {
+                        camera.transform.position += camera.transform.get_right() * move_distance;
+                        moved = true;
+                    }
+                    if input_state.is_keycode_pressed(KeyCode::ControlLeft) {
+                        camera.transform.position += -glam::f32::Vec3::Y * move_distance;
+                        moved = true;
+                    }
+                    if input_state.is_keycode_pressed(KeyCode::Space)  {
+                        camera.transform.position += glam::f32::Vec3::Y * move_distance;
+                        moved = true;
+                    }
                 }
                 if moved || true { // 总是重绘以保持流畅
                     window.request_redraw();

@@ -38,3 +38,25 @@ impl Transform {
         glam::f32::Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
     }
 }
+
+pub fn look_at_rh(eye: glam::f32::Vec3, center: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat {
+    look_to_rh(center - eye, up)
+}
+pub fn look_to_rh(dir: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat {
+    let f = dir.normalize();        // forward
+    let u0 = up.normalize();        // original up
+
+    // 正确：右手系 right = cross(forward, up)
+    let r = f.cross(u0).normalize();
+
+    // 修正 up = cross(right, forward)
+    let u = r.cross(f);
+
+    let rot = glam::f32::Mat3::from_cols(
+        r,      // +X
+        u,      // +Y
+        -f,     // +Z backward for RH camera
+    );
+
+    glam::f32::Quat::from_mat3(&rot)
+}
