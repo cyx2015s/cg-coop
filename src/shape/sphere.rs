@@ -36,13 +36,13 @@ impl AsMesh for Sphere {
                 let first = row * (self.col_divisions + 1) + col;
                 let second = first + self.col_divisions + 1;
 
-                indices.push(first as u16);
-                indices.push(second as u16);
-                indices.push((first + 1) as u16);
+                indices.push(first);
+                indices.push(second);
+                indices.push(((first + 1)));
 
-                indices.push(second as u16);
-                indices.push((second + 1) as u16);
-                indices.push((first + 1) as u16);
+                indices.push(second);
+                indices.push(((second + 1)));
+                indices.push(((first + 1)));
             }
         }
 

@@ -45,7 +45,7 @@ fn main() {
     // 定义时间戳
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
-    let mut ui_last_frame_time = Instant::now();
+    let ui_last_frame_time = Instant::now();
     // 定义着色器的路径
     let vertex_path = "assets/shaders/lambert.vert";
     let fragment_path = "assets/shaders/lambert.frag";
@@ -283,7 +283,7 @@ fn main() {
                     _cn_font.pop();
                     let draw_data = ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {
-                        ui_renderer.render(&mut target, &draw_data).unwrap();
+                        ui_renderer.render(&mut target, draw_data).unwrap();
                     }
                     target.finish().unwrap();
                 }

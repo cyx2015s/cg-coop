@@ -7,6 +7,12 @@ pub struct MouseState {
     pub sensitivity: f32,
 }
 
+impl Default for MouseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MouseState {
     pub fn new() -> Self {
         Self {

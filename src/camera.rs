@@ -39,7 +39,7 @@ impl Camera {
         Self {
             transform: transform::Transform::default(),
             fovy: 3.141592 / 3.0,
-            aspect: aspect,
+            aspect,
             znear: 0.1,
             zfar: 1024.0,
             pitch: 0.0,
@@ -64,13 +64,13 @@ impl Camera {
 
     // 获取视图矩阵
     pub fn get_view_matrix(&self) -> [[f32; 4]; 4] {
-        let view_matrix = glam::f32::Mat4::look_to_rh(
+        
+        glam::f32::Mat4::look_to_rh(
             self.transform.position,      // 相机位置
             self.transform.get_forward(), // 目标点（相机位置 + 前向方向）
             glam::f32::Vec3::Y,           // 上方向
         )
-        .to_cols_array_2d();
-        view_matrix
+        .to_cols_array_2d()
     }
 
     pub fn start_pan_obit(&mut self, angle: f32, raduis: f32, center: [f32; 3]) {
