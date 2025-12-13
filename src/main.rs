@@ -1,18 +1,17 @@
 use cg_coop::base::cube;
 use cg_coop::base::keystate::InputState;
+use cg_coop::base::light::{AmbientLight, DirectionalLight, PointLight, SpotLight};
+use cg_coop::base::material::*;
 use cg_coop::base::mouse;
 use cg_coop::camera;
 use cg_coop::shader;
-use cg_coop::base::material::*;
-use cg_coop::base::light::{DirectionalLight, PointLight, SpotLight, AmbientLight};
-use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent, };
+use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
 use imgui::Condition;
 use imgui::FontConfig;
 use imgui::FontGlyphRanges;
 use imgui::FontSource;
-use imgui::InputTextFlags;
 use std::time::Instant;
 
 fn _print_type<T>(_: &T) {
@@ -22,7 +21,8 @@ fn main() {
     // 定义灯光和材质
     let mut lambertian = Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
     let mut ambient_light = AmbientLight::new(0.2);
-    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
+    let mut directional_light =
+        DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
         position: [2.0, 2.0, 2.0],
         intensity: 0.0,
@@ -47,16 +47,14 @@ fn main() {
     let mut last_frame_time = Instant::now();
     let mut ui_last_frame_time = Instant::now();
     // 定义着色器的路径
-    let vertex_path = "../assets/shaders/lambert.vert";
-    let fragment_path = "../assets/shaders/lambert.frag";
+    let vertex_path = "assets/shaders/lambert.vert";
+    let fragment_path = "assets/shaders/lambert.frag";
     let global_ctx = cg_coop::ctx::GlobalContext {
         ui_ctx: imgui::Context::create(),
     };
 
     // 启动
-    let event_loop = winit::event_loop::EventLoop::builder()
-        .build()
-        .unwrap();
+    let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
         .with_title("Project")
         .build(&event_loop);
@@ -211,7 +209,7 @@ fn main() {
                             if key_event.physical_key == KeyCode::KeyR {
                                 camera.fovy = 3.141592 / 2.0;
                             }
-                            if key_event.physical_key == KeyCode::KeyP { 
+                            if key_event.physical_key == KeyCode::KeyP {
                                 let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
                                 let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
                                 let image = image::DynamicImage::ImageRgba8(image).flipv();
@@ -231,39 +229,28 @@ fn main() {
                         camera.update_pan_obit(delta_time);
                     }
                     ui_last_frame_time = Instant::now();
-                    
                     let ui = ui_ctx.frame();
                     let _cn_font = ui.push_font(cn_font);
                     ui.show_demo_window(&mut true);
-                    ui.window("Hello world")
+                    ui.window("操作说明")
                         .size([300.0, 100.0], Condition::FirstUseEver)
                         .build(|| {
-                            ui.text("Hello world!");
-                            ui.text("你好世界！");
-                            ui.text("This...is...imgui-rs!");
-                            ui.separator();
-                            let mouse_pos = ui.io().mouse_pos;
-                            ui.text(format!(
-                                "Mouse Position: ({:.1},{:.1})",
-                                mouse_pos[0], mouse_pos[1]
-                            ));
+                            ui.text_wrapped("按B键漫游\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
                         });
                     ui.window("灯光与材质测试").size([400.0, 200.0], Condition::FirstUseEver).build(|| {
-                        
                         ui.slider("环境光强度", 0.0, 1.0, &mut ambient_light.intensity);
                         ui.slider("平行光强度", 0.0, 5.0, &mut directional_light.intensity);
                         ui.slider("点光源强度", 0.0, 50.0, &mut point_light.intensity);
                         ui.slider("聚光灯强度", 0.0, 100.0, &mut spot_light.intensity);
                         ui.separator();
-                        ui.input_float3("平行光方向", &mut directional_light.direction).build();
+                        ui.slider_config("平行光方向", -3.0, 3.0).build_array(&mut directional_light.direction);
                         ui.color_edit3("平行光颜色", &mut directional_light.color);
                         ui.separator();
-                        ui.input_float3("点光源位置", &mut point_light.position).build();
+                        ui.slider_config("点光源位置", -10.0, 10.0).build_array(&mut point_light.position);
                         ui.color_edit3("点光源颜色", &mut point_light.color);
                         ui.separator();
                         ui.color_edit3("材质 ka", &mut lambertian.ka);
                         ui.color_edit3("材质 kd", &mut lambertian.kd);
-                        
                     });
                     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
                     let model = [

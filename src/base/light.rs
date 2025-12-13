@@ -1,4 +1,3 @@
-
 // use glium::implement_uniform_block;
 // use glium::program::{ BlockLayout};
 // use glium::uniforms::{ LayoutMismatchError, UniformBlock, UniformType };
@@ -7,45 +6,45 @@
 // px, dx, cr, kc
 // py, dy, cg, kl
 // pz, dz, cb, kq
-// intensity, angle, pad, light_type 
+// intensity, angle, pad, light_type
 
 pub struct AmbientLight {
-    pub intensity : f32,
-    pub color : [f32; 3],
+    pub intensity: f32,
+    pub color: [f32; 3],
 }
 
 pub struct DirectionalLight {
-    pub position : [f32; 3],
-    pub direction : [f32; 3],
-    pub intensity : f32,
-    pub color : [f32; 3],
+    pub position: [f32; 3],
+    pub direction: [f32; 3],
+    pub intensity: f32,
+    pub color: [f32; 3],
 }
 
 pub struct PointLight {
-    pub position : [f32; 3],
-    pub intensity : f32,
-    pub color : [f32; 3],
-    pub kc : f32,
-    pub kl : f32,
-    pub kq : f32,
+    pub position: [f32; 3],
+    pub intensity: f32,
+    pub color: [f32; 3],
+    pub kc: f32,
+    pub kl: f32,
+    pub kq: f32,
 }
 
 pub struct SpotLight {
-    pub position : [f32; 3],
-    pub direction : [f32; 3],
-    pub intensity : f32,
-    pub color : [f32; 3],
-    pub angle : f32,
-    pub kc : f32,
-    pub kl : f32,
-    pub kq : f32,
+    pub position: [f32; 3],
+    pub direction: [f32; 3],
+    pub intensity: f32,
+    pub color: [f32; 3],
+    pub angle: f32,
+    pub kc: f32,
+    pub kl: f32,
+    pub kq: f32,
 }
 
 impl AmbientLight {
-    pub fn new(intensity : f32) -> Self {
+    pub fn new(intensity: f32) -> Self {
         Self {
             intensity,
-            color : [1.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0],
         }
     }
 
@@ -61,7 +60,7 @@ impl AmbientLight {
 }
 
 impl DirectionalLight {
-    pub fn new(position: [f32; 3], direction: [f32; 3] , intensity : f32, color : [f32; 3]) -> Self {
+    pub fn new(position: [f32; 3], direction: [f32; 3], intensity: f32, color: [f32; 3]) -> Self {
         Self {
             position,
             direction,
@@ -72,10 +71,10 @@ impl DirectionalLight {
 
     pub fn default() -> Self {
         Self {
-            position : [0.0, 0.0, 0.0],
-            direction : [0.0, 0.0, -1.0],
-            intensity : 1.0,
-            color : [1.0, 1.0, 1.0],
+            position: [0.0, 0.0, 0.0],
+            direction: [0.0, 0.0, -1.0],
+            intensity: 1.0,
+            color: [1.0, 1.0, 1.0],
         }
     }
 
@@ -98,12 +97,17 @@ impl DirectionalLight {
         data[3][3] = 1.0;
         data
     }
-
-
 }
 
 impl PointLight {
-    pub fn new(position: [f32; 3], intensity : f32, color : [f32; 3], kc : f32, kl : f32, kq : f32) -> Self {
+    pub fn new(
+        position: [f32; 3],
+        intensity: f32,
+        color: [f32; 3],
+        kc: f32,
+        kl: f32,
+        kq: f32,
+    ) -> Self {
         Self {
             position,
             intensity,
@@ -116,12 +120,12 @@ impl PointLight {
 
     pub fn default() -> Self {
         Self {
-            position : [0.0, 0.0, 0.0],
-            intensity : 1.0,
-            color : [1.0, 1.0, 1.0],
-            kc : 1.0,
-            kl : 0.0,
-            kq : 1.0,
+            position: [0.0, 0.0, 0.0],
+            intensity: 1.0,
+            color: [1.0, 1.0, 1.0],
+            kc: 1.0,
+            kl: 0.0,
+            kq: 1.0,
         }
     }
 
@@ -140,11 +144,19 @@ impl PointLight {
         data[3][3] = 2.0;
         data
     }
-
 }
 
 impl SpotLight {
-    pub fn new(position: [f32; 3],direction: [f32; 3], intensity : f32, color : [f32; 3], angle : f32, kc : f32, kl : f32, kq : f32) -> Self {
+    pub fn new(
+        position: [f32; 3],
+        direction: [f32; 3],
+        intensity: f32,
+        color: [f32; 3],
+        angle: f32,
+        kc: f32,
+        kl: f32,
+        kq: f32,
+    ) -> Self {
         Self {
             position,
             direction,
@@ -159,14 +171,14 @@ impl SpotLight {
 
     pub fn default() -> Self {
         Self {
-            position : [0.0, 0.0, 0.0],
-            direction : [0.0, 0.0, -1.0],
-            intensity : 1.0,
-            color : [1.0, 1.0, 1.0],
-            angle : 30.0,
-            kc : 1.0,
-            kl : 0.0,
-            kq : 1.0,
+            position: [0.0, 0.0, 0.0],
+            direction: [0.0, 0.0, -1.0],
+            intensity: 1.0,
+            color: [1.0, 1.0, 1.0],
+            angle: 30.0,
+            kc: 1.0,
+            kl: 0.0,
+            kq: 1.0,
         }
     }
 
@@ -209,7 +221,7 @@ impl SpotLight {
 // pub struct Light {
 //     pub color: [f32; 3],
 //     pub intensity: f32,
-    
+
 //     pub position: [f32; 3],
 //     pub angle: f32,
 
@@ -250,7 +262,7 @@ impl SpotLight {
 //             if members[0].0 != "value" {
 //                 return Err(LayoutMismatchError);
 //             }
-            
+
 //             if let BlockLayout::BasicType { ty, offset_in_buffer} = members[0].1 {
 //                 if *ty != UniformType::FloatVec4 {
 //                     return Err(LayoutMismatchError);
@@ -260,8 +272,6 @@ impl SpotLight {
 //             } else {
 //                 Err(LayoutMismatchError)
 //             }
-            
-            
 
 //             Ok(())
 //         } else {

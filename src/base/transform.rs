@@ -1,4 +1,3 @@
-
 pub struct Transform {
     pub position: glam::f32::Vec3,
     pub rotation: glam::f32::Quat,
@@ -6,7 +5,11 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn new(position : glam::f32::Vec3, rotation: glam::f32::Quat, scale: glam::f32::Vec3 ) -> Self {
+    pub fn new(
+        position: glam::f32::Vec3,
+        rotation: glam::f32::Quat,
+        scale: glam::f32::Vec3,
+    ) -> Self {
         Self {
             position,
             rotation,
@@ -15,7 +18,11 @@ impl Transform {
     }
 
     pub fn default() -> Self {
-        Transform::new(glam::f32::Vec3::ZERO, glam::f32::Quat::IDENTITY, glam::f32::Vec3::ONE)
+        Transform::new(
+            glam::f32::Vec3::ZERO,
+            glam::f32::Quat::IDENTITY,
+            glam::f32::Vec3::ONE,
+        )
     }
 
     pub fn look_at(&mut self, target: glam::f32::Vec3, up: glam::f32::Vec3) {
@@ -39,12 +46,16 @@ impl Transform {
     }
 }
 
-pub fn look_at_rh(eye: glam::f32::Vec3, center: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat {
+pub fn look_at_rh(
+    eye: glam::f32::Vec3,
+    center: glam::f32::Vec3,
+    up: glam::f32::Vec3,
+) -> glam::f32::Quat {
     look_to_rh(center - eye, up)
 }
 pub fn look_to_rh(dir: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat {
-    let f = dir.normalize();        // forward
-    let u0 = up.normalize();        // original up
+    let f = dir.normalize(); // forward
+    let u0 = up.normalize(); // original up
 
     // 正确：右手系 right = cross(forward, up)
     let r = f.cross(u0).normalize();
@@ -53,9 +64,9 @@ pub fn look_to_rh(dir: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat 
     let u = r.cross(f);
 
     let rot = glam::f32::Mat3::from_cols(
-        r,      // +X
-        u,      // +Y
-        -f,     // +Z backward for RH camera
+        r,  // +X
+        u,  // +Y
+        -f, // +Z backward for RH camera
     );
 
     glam::f32::Quat::from_mat3(&rot)

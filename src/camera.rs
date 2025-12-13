@@ -32,7 +32,6 @@ pub struct Camera {
     pub pan_obit_angle: f32,
     pub pan_obit_radius: f32,
     pub pan_obit_center: [f32; 3],
-    
 }
 
 impl Camera {
@@ -57,10 +56,10 @@ impl Camera {
 
     pub fn rotate(&mut self, yaw: f32, pitch: f32) {
         self.pitch = (self.pitch + pitch).clamp(-1.55, 1.55);
-        self.yaw    += yaw;
+        self.yaw += yaw;
         let yaw_quat = glam::f32::Quat::from_axis_angle(glam::f32::Vec3::Y, self.yaw);
         let pitch_quat = glam::f32::Quat::from_axis_angle(glam::f32::Vec3::X, self.pitch);
-        self.transform.rotation = yaw_quat * pitch_quat  * glam::f32::Quat::IDENTITY;
+        self.transform.rotation = yaw_quat * pitch_quat * glam::f32::Quat::IDENTITY;
     }
 
     // 获取视图矩阵
@@ -68,7 +67,7 @@ impl Camera {
         let view_matrix = glam::f32::Mat4::look_to_rh(
             self.transform.position,      // 相机位置
             self.transform.get_forward(), // 目标点（相机位置 + 前向方向）
-            glam::f32::Vec3::Y,      // 上方向
+            glam::f32::Vec3::Y,           // 上方向
         )
         .to_cols_array_2d();
         view_matrix
@@ -85,8 +84,10 @@ impl Camera {
     pub fn update_pan_obit(&mut self, delta_time: f32) {
         self.pan_obit_angle += delta_time * self.pan_obit_speed;
         self.transform.position.y = self.pan_obit_pitch.sin() * self.pan_obit_radius;
-        self.transform.position.x = self.pan_obit_pitch.cos() * self.pan_obit_radius * self.pan_obit_angle.sin();
-        self.transform.position.z = self.pan_obit_pitch.cos() * self.pan_obit_radius * self.pan_obit_angle.cos();
+        self.transform.position.x =
+            self.pan_obit_pitch.cos() * self.pan_obit_radius * self.pan_obit_angle.sin();
+        self.transform.position.z =
+            self.pan_obit_pitch.cos() * self.pan_obit_radius * self.pan_obit_angle.cos();
         self.transform.position += glam::f32::Vec3::from(self.pan_obit_center);
         self.transform.look_at(
             glam::f32::Vec3::from(self.pan_obit_center),

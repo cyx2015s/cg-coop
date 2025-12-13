@@ -1,7 +1,4 @@
-
 // use glium::implement_uniform_block;
-
-
 
 pub struct Lambertian {
     pub ka: [f32; 3],
@@ -10,10 +7,7 @@ pub struct Lambertian {
 
 impl Lambertian {
     pub fn new(ka: [f32; 3], kd: [f32; 3]) -> Self {
-        Self {
-            ka,
-            kd,
-        }
+        Self { ka, kd }
     }
 
     pub fn get_mat3_data(&self) -> [[f32; 3]; 3] {
@@ -33,7 +27,6 @@ impl Lambertian {
 // pub struct MaterialBlock {
 //     pub material: Material,
 // }
-
 
 // #[repr(C, align(16))]
 // #[derive(Copy, Clone, Debug)]
@@ -55,7 +48,6 @@ impl Lambertian {
 //         }
 //     }
 // }
-
 
 // implement_uniform_block!(Material, ka, padding, kd, shininess);
 // implement_uniform_block!(MaterialBlock, material);
