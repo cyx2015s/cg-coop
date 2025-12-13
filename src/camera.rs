@@ -54,6 +54,10 @@ impl Camera {
         }
     }
 
+    pub fn get_position(&self) -> [f32; 3] {
+        self.transform.position.to_array()
+    }
+
     pub fn rotate(&mut self, yaw: f32, pitch: f32) {
         self.pitch = (self.pitch + pitch).clamp(-1.55, 1.55);
         self.yaw += yaw;

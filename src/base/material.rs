@@ -1,5 +1,38 @@
 // use glium::implement_uniform_block;
 
+pub struct Phong {
+    pub ka: [f32; 3],
+    pub kd: [f32; 3],
+    pub ks: [f32; 3],
+    pub ns: f32,
+}
+
+impl Phong {
+    pub fn new(ka: [f32; 3], kd: [f32; 3], ks: [f32; 3], ns: f32) -> Self {
+        Self { ka, kd, ks, ns }
+    }
+
+    // mat4
+    // ka.x, kd.x, ks.x, 0
+    // ka.y, kd.y, ks.y, 0
+    // ka.z, kd.z, ks.z, 0
+    // 0   , 0   , 0   , ns
+    pub fn get_mat4_data(&self) -> [[f32; 4]; 4] {
+        let mut data = [[0.0; 4]; 4];
+        data[0][0] = self.ka[0];
+        data[0][1] = self.ka[1];
+        data[0][2] = self.ka[2];
+        data[1][0] = self.kd[0];
+        data[1][1] = self.kd[1];
+        data[1][2] = self.kd[2];
+        data[2][0] = self.ks[0];
+        data[2][1] = self.ks[1];
+        data[2][2] = self.ks[2];
+        data[3][3] = self.ns;
+        data
+     }
+}
+
 pub struct Lambertian {
     pub ka: [f32; 3],
     pub kd: [f32; 3],

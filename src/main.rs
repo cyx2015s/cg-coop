@@ -1,7 +1,7 @@
 use cg_coop::base::cube;
 use cg_coop::base::keystate::InputState;
 use cg_coop::base::light::{AmbientLight, DirectionalLight, PointLight, SpotLight};
-use cg_coop::base::material::*;
+use cg_coop::base::material;
 use cg_coop::base::mouse;
 use cg_coop::camera;
 use cg_coop::shader;
@@ -18,8 +18,15 @@ fn _print_type<T>(_: &T) {
     println!("{}", std::any::type_name::<T>());
 }
 fn main() {
+    // 定义着色器的路径
+    let phong_vertex_path = "assets/shaders/Phong.vert";
+    let phong_fragment_path = "assets/shaders/Phong.frag";
+
+    let lambert_vertex_path = "assets/shaders/Lambert.vert";
+    let lambert_fragment_path = "assets/shaders/Lambert.frag";
     // 定义灯光和材质
-    let mut lambertian = Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
+    let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
+    let mut phong = material::Phong::new([1.0, 0.03, 0.03], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0], 10.0);
     let mut ambient_light = AmbientLight::new(0.2);
     let mut directional_light =
         DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
@@ -46,9 +53,7 @@ fn main() {
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
     let ui_last_frame_time = Instant::now();
-    // 定义着色器的路径
-    let vertex_path = "assets/shaders/lambert.vert";
-    let fragment_path = "assets/shaders/lambert.frag";
+
     let global_ctx = cg_coop::ctx::GlobalContext {
         ui_ctx: imgui::Context::create(),
     };
@@ -137,7 +142,8 @@ fn main() {
     // .unwrap();
 
     // 通过调用 shader库中的 create_shader 函数来创建着色器程序
-    let program = shader::create_shader(&display, vertex_path, fragment_path);
+    let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
+    let lambert_program = shader::create_shader(&display, lambert_vertex_path, lambert_fragment_path);
     #[allow(deprecated)]
     event_loop
         .run(move |ev, window_target| {
@@ -235,7 +241,7 @@ fn main() {
                     ui.window("操作说明")
                         .size([300.0, 100.0], Condition::FirstUseEver)
                         .build(|| {
-                            ui.text_wrapped("按B键漫游\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
+                            ui.text_wrapped("按V键漫游\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
                         });
                     ui.window("灯光与材质测试").size([400.0, 200.0], Condition::FirstUseEver).build(|| {
                         ui.slider("环境光强度", 0.0, 1.0, &mut ambient_light.intensity);
@@ -260,6 +266,7 @@ fn main() {
                         [0.0, 0.0, 2.0, 1.0f32]
                     ];
                     let view = camera.get_view_matrix();
+                    let viewPos = camera.get_position();
                     let perspective = camera.get_projection_matrix();
                     let params = glium::DrawParameters {
                         depth: glium::Depth {
@@ -270,8 +277,21 @@ fn main() {
                         //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
                         .. Default::default()
                     };
+                    
                     let light = [-1.0, 0.4, 0.9f32];
-                    target.draw((&positions, &normals), &indices, &program,
+                    
+                    // target.draw((&positions, &normals), &indices, &phong_program,
+                    //             &uniform! { model: model, view: view, perspective: perspective,
+                    //             viewPos: viewPos,
+                    //             material: phong.get_mat4_data(),
+                    //             ambient_light: ambient_light.get_mat4_data(),
+                    //             directional_light: directional_light.get_mat4_data(),
+                    //             point_light: point_light.get_mat4_data(),
+                    //             spot_light: spot_light.get_mat4_data(),
+                    //             },
+                    //             &params).unwrap();
+                                
+                    target.draw((&positions, &normals), &indices, &lambert_program,
                                 &uniform! { model: model, view: view, perspective: perspective,
                                 material: lambertian.get_mat3_data(),
                                 ambient_light: ambient_light.get_mat4_data(),
