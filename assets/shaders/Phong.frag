@@ -6,58 +6,86 @@ in vec3 v_normal;
 out vec4 color;
 
 uniform vec3 viewPos;
-uniform mat4 ambient_light;
-uniform mat4 directional_light;
-uniform mat4 point_light;
-uniform mat4 spot_light;
-uniform mat4 material;
 
-vec3 calcAmbientLight() {
-    return ambient_light[2].xyz * ambient_light[0][3] * material[0].xyz;
+struct Light {
+    vec3 color;
+    float intensity;
+    vec3 position;
+    float angle;
+    vec3 direction;
+    float range;
+    vec3 kfactor;
+    int light_type;
+};
+
+struct Material {
+    vec3 ka;
+    float _pad1;
+    vec3 kd;
+    float _pad2;
+    vec3 ks;
+    float ns;
+};
+
+layout(std140) uniform Light_Block {
+    Light lights[32];
+    int num_lights;
+};
+
+layout(std140) uniform Material_Block {
+    Material material;
+};
+
+vec3 calcAmbientLight(Light l) { 
+    return l.color * l.intensity * material.ka;
 }
 
-vec3 calcDirectionalLight(vec3 normal) {
-    vec3 lightDir = normalize(-directional_light[1].xyz);
-    vec3 diffuse = directional_light[2].xyz * max(dot(lightDir, normal), 0.0f) * material[1].xyz;
+vec3 calcDirectionalLight(Light l, vec3 normal) {
+    vec3 lightDir = normalize(-l.direction);
+    vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * material.kd;
     vec3 reflectDir = reflect(lightDir, normal);
     vec3 viewDir = normalize(viewPos - v_position);
-    vec3 spec = directional_light[2].xyz * pow(max(dot(reflectDir, viewDir), 0.0f), material[3][3]) * material[2].xyz;
-    return directional_light[0][3] * (diffuse + spec);
+    vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks;
+    return l.intensity * (diffuse + spec);
 }
 
-vec3 calPointLight(vec3 normal) {
-    vec3 lightDir = normalize(point_light[0].xyz - v_position);
-    vec3 diffuse = point_light[2].xyz * max(dot(lightDir, normal), 0.0f) * material[1].xyz;
-    float distance = length(v_position - point_light[0].xyz);
-    float attenuation = 1.0f / (point_light[3][0] + point_light[3][1] * distance + point_light[3][2] * distance * distance);
+vec3 calPointLight(Light l, vec3 normal) {
+    vec3 lightDir = normalize(l.position - v_position);
+    vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * material.kd;
+    float distance = length(v_position - l.position);
+    float attenuation = 1.0f / (l.kfactor[0] + l.kfactor[1] * distance + l.kfactor[2] * distance * distance);
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 viewDir = normalize(viewPos - v_position);
-    vec3 spec = point_light[2].xyz * pow(max(dot(reflectDir, viewDir), 0.0f), material[3][3]) * material[2].xyz;
-    return point_light[0][3] * (diffuse + spec) * attenuation;
+    vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks;
+    return l.intensity * (diffuse + spec) * attenuation;
 }
 
-vec3 calSpotLight(vec3 normal) { 
-    vec3 lightDir = normalize(spot_light[0].xyz - v_position);
-    float theta = acos(-dot(lightDir, normalize(spot_light[1].xyz)));
-    if (theta > spot_light[1][3]) {
+vec3 calSpotLight(Light l, vec3 normal) { 
+    vec3 lightDir = normalize(l.position - v_position);
+    float theta = acos(-dot(lightDir, normalize(l.direction)));
+    if (theta > l.angle) {
         return vec3(0.0f);
     }
-    vec3 diffuse = spot_light[2].xyz * max(dot(lightDir, normal), 0.0f) * material[1].xyz;
-    float distance = length(v_position - spot_light[0].xyz);
-    float attenuation = 1.0f / (spot_light[3][0] + spot_light[3][1] * distance + spot_light[3][2] * distance * distance);
+    vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * material.kd;
+    float distance = length(v_position - l.position);
+    float attenuation = 1.0f / (l.kfactor[0] + l.kfactor[1] * distance + l.kfactor[2] * distance * distance);
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 viewDir = normalize(viewPos - v_position);
-    vec3 spec = spot_light[2].xyz * pow(max(dot(reflectDir, viewDir), 0.0f), material[3][3]) * material[2].xyz;
-    return spot_light[0][3] * (diffuse + spec) * attenuation;
+    vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks;
+    return l.intensity * (diffuse + spec) * attenuation;
 }
 
 void main() {
     vec3 normal = normalize(v_normal);
     vec3 light_color = vec3(0.0f);
-    light_color += calcAmbientLight();
-    light_color += calcDirectionalLight(normal);
-    light_color += calPointLight(normal);
-    light_color += calSpotLight(normal);
+    for (int i = 0; i < num_lights; i++) {
+        switch (lights[i].light_type) {
+            case 0: light_color += calcAmbientLight(lights[i]); break;
+            case 1: light_color += calcDirectionalLight(lights[i], normal); break;
+            case 2: light_color += calPointLight(lights[i], normal); break;
+            case 3: light_color += calSpotLight(lights[i], normal); break;
+        }
+    }
     color = vec4(light_color, 1.0f);
   
 }

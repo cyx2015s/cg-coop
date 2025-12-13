@@ -1,6 +1,55 @@
 // use glium::implement_uniform_block;
 // use glium::program::{ BlockLayout};
 // use glium::uniforms::{ LayoutMismatchError, UniformBlock, UniformType };
+use crate::implement_uniform_block_new;
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct LightBlock {
+    pub lights: [Light; 32],
+    pub num_lights: i32,
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct Light {
+    pub color: [f32; 3],
+    pub intensity: f32,
+
+    pub position: [f32; 3],
+    pub angle: f32,
+
+    pub direction: [f32; 3],
+    pub range: f32,
+
+    pub kfactor: [f32; 3],
+    pub light_type: i32,
+}
+
+impl Light {
+    pub fn new() -> Self {
+        Self {
+            color: [1.0, 1.0, 1.0],
+            intensity: 1.0,
+            position: [0.0, 0.0, 0.0],
+            angle: 30.0,
+            direction: [0.0, 0.0, -1.0],
+            range: 10.0,
+            kfactor: [0.0; 3],
+            light_type: 0,
+        }
+    }
+}
+
+impl Default for Light {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
+implement_uniform_block_new!(Light, color, intensity, position, angle, direction, range, kfactor, light_type);
+implement_uniform_block_new!(LightBlock, lights, num_lights);
 
 // using mat4 to pass the light
 // px, dx, cr, kc
@@ -13,6 +62,7 @@ pub struct AmbientLight {
     pub color: [f32; 3],
 }
 
+#[derive(Copy, Clone)]
 pub struct DirectionalLight {
     pub position: [f32; 3],
     pub direction: [f32; 3],
@@ -48,6 +98,18 @@ impl AmbientLight {
         }
     }
 
+    pub fn to_Light(&self) -> Light { 
+        Light {
+            color: self.color,
+            intensity: self.intensity,
+            position: [0.0, 0.0, 0.0],
+            angle: 0.0,
+            direction: [0.0, 0.0, -1.0],
+            range: 0.0,
+            kfactor: [0.0, 0.0, 0.0],
+            light_type: 0,
+        }
+    }
     pub fn get_mat4_data(&self) -> [[f32; 4]; 4] {
         let mut data = [[0.0; 4]; 4];
         data[0][3] = self.intensity;
@@ -80,6 +142,19 @@ impl DirectionalLight {
 
     pub fn get_forward(&self) -> [f32; 3] {
         self.direction
+    }
+
+    pub fn to_Light(&self) -> Light { 
+        Light {
+            color: self.color,
+            intensity: self.intensity,
+            position: self.position,
+            angle: 0.0,
+            direction: self.direction,
+            range: 0.0,
+            kfactor: [0.0, 0.0, 0.0],
+            light_type: 1,
+        }
     }
 
     pub fn get_mat4_data(&self) -> [[f32; 4]; 4] {
@@ -129,6 +204,18 @@ impl PointLight {
         }
     }
 
+    pub fn to_Light(&self) -> Light { 
+        Light {
+            color: self.color,
+            intensity: self.intensity,
+            position: self.position,
+            angle: 0.0,
+            direction: [0.0, 0.0, -1.0],
+            range: 0.0,
+            kfactor: [self.kc, self.kl, self.kq],
+            light_type: 2,
+        }
+    }
     pub fn get_mat4_data(&self) -> [[f32; 4]; 4] {
         let mut data = [[0.0; 4]; 4];
         data[0][0] = self.position[0];
@@ -182,6 +269,18 @@ impl SpotLight {
         }
     }
 
+    pub fn to_Light(&self) -> Light { 
+        Light {
+            color: self.color,
+            intensity: self.intensity,
+            position: self.position,
+            angle: self.angle,
+            direction: self.direction,
+            range: 0.0,
+            kfactor: [self.kc, self.kl, self.kq],
+            light_type: 3,
+        }
+    }
     pub fn get_mat4_data(&self) -> [[f32; 4]; 4] {
         let mut data = [[0.0; 4]; 4];
         data[0][0] = self.position[0];
@@ -211,44 +310,7 @@ impl SpotLight {
 //     pub _pad: [i32; 3],
 // }
 
-// #[derive(Copy, Clone)]
-// struct Vertex {
-//     value: [f32; 4],
-// }
 
-// #[repr(C, align(16))]
-// #[derive(Copy, Clone, Debug)]
-// pub struct Light {
-//     pub color: [f32; 3],
-//     pub intensity: f32,
-
-//     pub position: [f32; 3],
-//     pub angle: f32,
-
-//     pub direction: [f32; 3],
-//     pub range: f32,
-
-//     pub kfactor: [f32; 3],
-//     pub light_type: i32,
-
-// }
-
-// impl Light {
-//     pub fn new() -> Self {
-//         Self {
-//             color: [1.0, 1.0, 1.0],
-//             intensity: 1.0,
-//             position: [0.0, 0.0, 0.0],
-//             angle: 30.0,
-//             direction: [0.0, 0.0, -1.0],
-//             range: 10.0,
-//             light_type: 0,
-//             kfactor: [1.0, 0.0, 1.0],
-//         }
-//     }
-// }
-
-// implement_uniform_block!(Light, color, intensity, position, angle, direction, range, kfactor, light_type);
 // implement_uniform_block!(LightBlock, lights, lightCount, _pad);
 
 // impl UniformBlock for Vertex {

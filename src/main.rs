@@ -1,6 +1,6 @@
 use cg_coop::base::cube;
 use cg_coop::base::keystate::InputState;
-use cg_coop::base::light::{AmbientLight, DirectionalLight, PointLight, SpotLight};
+use cg_coop::base::light::{Light, LightBlock, AmbientLight, DirectionalLight, PointLight, SpotLight};
 use cg_coop::base::material;
 use cg_coop::base::mouse;
 use cg_coop::camera;
@@ -18,6 +18,7 @@ fn _print_type<T>(_: &T) {
     println!("{}", std::any::type_name::<T>());
 }
 fn main() {
+
     // 定义着色器的路径
     let phong_vertex_path = "assets/shaders/Phong.vert";
     let phong_fragment_path = "assets/shaders/Phong.frag";
@@ -63,6 +64,18 @@ fn main() {
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
         .with_title("Project")
         .build(&event_loop);
+
+    let mut light_block = LightBlock { 
+        lights: [Light::default(); 32],
+        num_lights: 0,
+    };
+
+    let mut material_block = material::MaterialBlock {
+        material: material::Material::default(),
+    };
+
+    let light_ubo = glium::uniforms::UniformBuffer::new(&display, light_block).unwrap();
+    let material_ubo = glium::uniforms::UniformBuffer::new(&display, material_block).unwrap();
 
     let mut ui_ctx = global_ctx.ui_ctx;
     let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
@@ -277,29 +290,40 @@ fn main() {
                         //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
                         .. Default::default()
                     };
-                    
+                    let mut l_block = LightBlock {
+                        lights: [Light::default(); 32], // 初始化数组，每个元素都是 Light::default()
+                        num_lights: 0,
+                    };
+
+                    l_block.lights[l_block.num_lights as usize] = ambient_light.to_Light();
+                    l_block.num_lights += 1;
+                    l_block.lights[l_block.num_lights as usize] = directional_light.to_Light();
+                    l_block.num_lights += 1;
+                    l_block.lights[l_block.num_lights as usize] = point_light.to_Light();
+                    l_block.num_lights += 1;
+                    l_block.lights[l_block.num_lights as usize] = spot_light.to_Light();
+                    l_block.num_lights += 1;
+
+                    let mut m_block = material::MaterialBlock { material: phong.to_Material() };
+
+                    light_ubo.write(&l_block);
+                    material_ubo.write(&m_block);
                     let light = [-1.0, 0.4, 0.9f32];
                     
-                    // target.draw((&positions, &normals), &indices, &phong_program,
-                    //             &uniform! { model: model, view: view, perspective: perspective,
-                    //             viewPos: viewPos,
-                    //             material: phong.get_mat4_data(),
-                    //             ambient_light: ambient_light.get_mat4_data(),
-                    //             directional_light: directional_light.get_mat4_data(),
-                    //             point_light: point_light.get_mat4_data(),
-                    //             spot_light: spot_light.get_mat4_data(),
-                    //             },
-                    //             &params).unwrap();
-                                
-                    target.draw((&positions, &normals), &indices, &lambert_program,
+                    target.draw((&positions, &normals), &indices, &phong_program,
                                 &uniform! { model: model, view: view, perspective: perspective,
-                                material: lambertian.get_mat3_data(),
-                                ambient_light: ambient_light.get_mat4_data(),
-                                directional_light: directional_light.get_mat4_data(),
-                                point_light: point_light.get_mat4_data(),
-                                spot_light: spot_light.get_mat4_data(),
+                                viewPos: viewPos,
+                                Material_Block: &material_ubo,
+                                Light_Block: &light_ubo,
                                 },
                                 &params).unwrap();
+                                
+                    // target.draw((&positions, &normals), &indices, &lambert_program,
+                    //             &uniform! { model: model, view: view, perspective: perspective,
+                    //             Material_Block: &material_ubo,
+                    //             Light_Block: &light_ubo,
+                    //             },
+                    //             &params).unwrap();
                     _cn_font.pop();
                     let draw_data = ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {

@@ -1,4 +1,38 @@
+use crate::implement_uniform_block_new;
 // use glium::implement_uniform_block;
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct MaterialBlock { 
+    pub material: Material,
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct Material { 
+    pub ka: [f32; 3],
+    pub _pad1: f32,
+    pub kd: [f32; 3],
+    pub _pad2: f32,
+    pub ks: [f32; 3],
+    pub ns: f32,
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            ka: [0.1, 0.1, 0.1],
+            _pad1: 0.0,
+            kd: [0.8, 0.8, 0.8],
+            _pad2: 0.0,
+            ks: [0.5, 0.5, 0.5],
+            ns: 32.0,
+        }
+    }
+}
+
+implement_uniform_block_new!(Material, ka, _pad1, kd, _pad2, ks, ns);
+implement_uniform_block_new!(MaterialBlock, material);
 
 pub struct Phong {
     pub ka: [f32; 3],
@@ -10,6 +44,17 @@ pub struct Phong {
 impl Phong {
     pub fn new(ka: [f32; 3], kd: [f32; 3], ks: [f32; 3], ns: f32) -> Self {
         Self { ka, kd, ks, ns }
+    }
+
+    pub fn to_Material(&self) -> Material { 
+        Material {
+            ka: self.ka,
+            _pad1: 0.0,
+            kd: self.kd,
+            _pad2: 0.0,
+            ks: self.ks,
+            ns: self.ns,
+        }
     }
 
     // mat4
@@ -41,6 +86,17 @@ pub struct Lambertian {
 impl Lambertian {
     pub fn new(ka: [f32; 3], kd: [f32; 3]) -> Self {
         Self { ka, kd }
+    }
+
+    pub fn to_Material(&self) -> Material { 
+        Material {
+            ka: self.ka,
+            _pad1: 0.0,
+            kd: self.kd,
+            _pad2: 0.0,
+            ks: [0.0; 3],
+            ns: 0.0,
+        }
     }
 
     pub fn get_mat3_data(&self) -> [[f32; 3]; 3] {
