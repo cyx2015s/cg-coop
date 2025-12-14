@@ -1,4 +1,4 @@
-use crate::shape::mesh::AsMesh;
+use crate::shape::mesh::{AsMesh, Mesh};
 
 pub struct Cube {
     pub width: f32,
@@ -6,95 +6,63 @@ pub struct Cube {
     pub depth: f32,
 }
 
-///```txt
-///       ↑ y
-///       |
-///      3|______ 2
-///       /     /|
-///    7 /____6/ |
-///     |(0)  |  | 1 ____> x
-///     |     | /
-///     |_____|/
-///    / 4     5
-///   /
-///  z
-///```
-pub const CUBE_VERTICES: [[f32; 3]; 8] = [
-    [-1.0, -1.0, -1.0],
-    [1.0, -1.0, -1.0],
-    [1.0, 1.0, -1.0],
-    [-1.0, 1.0, -1.0],
-    [-1.0, -1.0, 1.0],
-    [1.0, -1.0, 1.0],
-    [1.0, 1.0, 1.0],
-    [-1.0, 1.0, 1.0],
-];
-
-pub const CUBE_INDICES: [u16; 36] = [
-    0, 1, 2, 2, 3, 0, // back face
-    4, 5, 6, 6, 7, 4, // front face
-    3, 2, 6, 6, 7, 3, // top face
-    0, 1, 5, 5, 4, 0, // bottom face
-    1, 2, 6, 6, 5, 1, // right face
-    0, 3, 7, 7, 4, 0, // left face
-];
-
-pub const CUBE_NORMALS: [[f32; 3]; 36] = [
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, -1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [0.0, -1.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-    [-1.0, 0.0, 0.0],
-];
-
 impl AsMesh for Cube {
-    fn as_mesh(&self) -> crate::shape::mesh::Mesh {
-        let vertices = CUBE_VERTICES
-            .iter()
-            .map(|v| {
-                [
-                    v[0] * self.width / 2.0,
-                    v[1] * self.height / 2.0,
-                    v[2] * self.depth / 2.0,
-                ]
-            })
-            .collect();
+    fn as_mesh(&self) -> Mesh {
+        let w = self.width / 2.0;
+        let h = self.height / 2.0;
+        let d = self.depth / 2.0;
 
-        crate::shape::mesh::Mesh {
-            vertices,
-            indices: CUBE_INDICES.to_vec(),
-            normals: CUBE_NORMALS.to_vec(),
+        // 定义 24 个顶点 (6面 * 4点)
+        // 每个面一组，顺序为：左下，右下，右上，左上 
+        let raw_vertices = vec![
+            // Front face (z = +d)
+            [-w, -h,  d], [ w, -h,  d], [ w,  h,  d], [-w,  h,  d],
+            // Back face (z = -d)
+            [ w, -h, -d], [-w, -h, -d], [-w,  h, -d], [ w,  h, -d],
+            // Top face (y = +h)
+            [-w,  h,  d], [ w,  h,  d], [ w,  h, -d], [-w,  h, -d],
+            // Bottom face (y = -h)
+            [-w, -h, -d], [ w, -h, -d], [ w, -h,  d], [-w, -h,  d],
+            // Right face (x = +w)
+            [ w, -h,  d], [ w, -h, -d], [ w,  h, -d], [ w,  h,  d],
+            // Left face (x = -w)
+            [-w, -h, -d], [-w, -h,  d], [-w,  h,  d], [-w,  h, -d],
+        ];
+
+        // 对应的法线 (24 个)
+        let raw_normals = vec![
+            // Front (0, 0, 1)
+            [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0],
+            // Back (0, 0, -1)
+            [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0],
+            // Top (0, 1, 0)
+            [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
+            // Bottom (0, -1, 0)
+            [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0],
+            // Right (1, 0, 0)
+            [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0],
+            // Left (-1, 0, 0)
+            [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        ];
+
+        // 索引
+        let mut indices: Vec<u16> = Vec::new();
+        for face in 0..6 {
+            let start = face * 4;
+            // Triangle 1
+            indices.push(start);
+            indices.push(start + 1);
+            indices.push(start + 2);
+            // Triangle 2
+            indices.push(start);
+            indices.push(start + 2);
+            indices.push(start + 3);
+        }
+
+        Mesh {
+            vertices: raw_vertices,
+            normals: raw_normals,
+            indices,
         }
     }
 }

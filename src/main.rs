@@ -13,10 +13,25 @@ use imgui::FontConfig;
 use imgui::FontGlyphRanges;
 use imgui::FontSource;
 use std::time::Instant;
+use cg_coop::shape::mesh::AsMesh; 
+use cg_coop::shape::{cube::Cube, sphere::Sphere, cylinder::Cylinder, cone::Cone};
 
 fn _print_type<T>(_: &T) {
     println!("{}", std::any::type_name::<T>());
 }
+
+#[derive(Copy, Clone)]
+struct Vertex {
+    position: [f32; 3],
+}
+implement_vertex!(Vertex, position);
+
+#[derive(Copy, Clone)]
+struct Normal {
+    normal: [f32; 3],
+}
+implement_vertex!(Normal, normal);
+
 fn main() {
 
     // 定义着色器的路径
@@ -86,7 +101,7 @@ fn main() {
         data: include_bytes!("../assets/fonts/font.ttf"),
         size_pixels: 32.0,
         config: Some(FontConfig {
-            glyph_ranges: FontGlyphRanges::chinese_simplified_common(),
+            glyph_ranges: FontGlyphRanges::chinese_full(),
             ..Default::default()
         }),
     }]);
@@ -99,15 +114,6 @@ fn main() {
         &window,
         imgui_winit_support::HiDpiMode::Locked(1.0),
     );
-
-    let positions = glium::VertexBuffer::new(&display, &cube::VERTICES).unwrap();
-    let normals = glium::VertexBuffer::new(&display, &cube::NORMALS).unwrap();
-    let indices = glium::IndexBuffer::new(
-        &display,
-        glium::index::PrimitiveType::TrianglesList,
-        &cube::INDICES,
-    )
-    .unwrap();
     let (width, height) = display.get_framebuffer_dimensions();
     let aspect_ratio = width as f32 / height as f32;
 
@@ -153,6 +159,15 @@ fn main() {
     //     &indices,
     // )
     // .unwrap();
+
+    // 定义初始状态 
+    let mut cy_radius = 1.0f32;      // 底面半径
+    let mut cy_top_radius = 0.5f32;  // 顶面半径
+    let mut cy_height = 2.0f32;      // 高度
+    let mut cy_sectors = 6i32;       // 切分份数
+
+    // 形状选择器
+    let mut shape_type = 4; // 默认选中棱台看效果
 
     // 通过调用 shader库中的 create_shader 函数来创建着色器程序
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
@@ -271,6 +286,42 @@ fn main() {
                         ui.color_edit3("材质 ka", &mut lambertian.ka);
                         ui.color_edit3("材质 kd", &mut lambertian.kd);
                     });
+                    ui.window("建模实验室").size([300.0, 350.0], Condition::FirstUseEver).build(|| {
+                        ui.text("选择形状 (Shape Select)");
+                        ui.radio_button("立方体 (Cube)", &mut shape_type, 0);
+                        ui.radio_button("球体 (Sphere)", &mut shape_type, 1);
+                        ui.radio_button("圆柱 (Cylinder)", &mut shape_type, 2);
+                        ui.radio_button("圆锥 (Cone)", &mut shape_type, 3);
+                        ui.radio_button("多面棱台/棱柱 (Frustum/Prism)", &mut shape_type, 4);
+                        
+                        ui.separator();
+                        ui.text("参数调整 (Parameters)");
+                        
+                        // 根据不同的形状显示不同的滑块
+                        match shape_type {
+                            1 => { // Sphere
+                                ui.slider("半径 (Radius)", 0.1, 5.0, &mut cy_radius);
+                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
+                            },
+                            2 => { // Cylinder
+                                ui.slider("半径 (Radius)", 0.1, 5.0, &mut cy_radius);
+                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
+                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
+                            },
+                            3 => { // Cone
+                                ui.slider("底面半径 (Radius)", 0.1, 5.0, &mut cy_radius);
+                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
+                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
+                            },
+                            4 => { // Frustum / Prism (多面棱台)
+                                ui.slider("底面半径 (Bottom R)", 0.1, 5.0, &mut cy_radius);
+                                ui.slider("顶面半径 (Top R)", 0.0, 5.0, &mut cy_top_radius); // 可以是0，就是棱锥
+                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
+                                ui.slider("侧面数 (Sides)", 3, 64, &mut cy_sectors); // 限制在3-64
+                            },
+                            _ => {} // Cube 不需要参数
+                        }
+                    });
                     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
                     let model = [
                         [0.5, 0.0, 0.0, 0.0],
@@ -309,6 +360,64 @@ fn main() {
                     light_ubo.write(&l_block);
                     material_ubo.write(&m_block);
                     let light = [-1.0, 0.4, 0.9f32];
+
+                    // 每一帧都根据最新参数生成模型，根据 shape_type 动态决定画什么
+                    let mesh_data = match shape_type {
+                        0 => { // Cube
+                             let s = Cube { width: cy_radius * 2.0, height: cy_radius * 2.0, depth: cy_radius * 2.0 };
+                             s.as_mesh()
+                        },
+                        1 => { // Sphere
+                             let s = Sphere { radius: cy_radius, col_divisions: cy_sectors as u16, row_divisions: cy_sectors as u16 };
+                             s.as_mesh()
+                        },
+                        2 => { // Cylinder
+                             let s = Cylinder { 
+                                 bottom_radius: cy_radius, 
+                                 top_radius: cy_radius, 
+                                 height: cy_height, 
+                                 sectors: cy_sectors as u16 
+                             };
+                             s.as_mesh()
+                        },
+                        3 => { // Cone
+                             let s = Cone { radius: cy_radius, height: cy_height, sectors: cy_sectors as u16 };
+                             s.as_mesh()
+                        },
+                        4 => { // Frustum (多面棱台)
+                             let s = Cylinder { 
+                                 bottom_radius: cy_radius, 
+                                 top_radius: cy_top_radius, // 使用独立的顶面半径
+                                 height: cy_height, 
+                                 sectors: cy_sectors as u16 
+                             };
+                             s.as_mesh()
+                        },
+                        _ => {
+                             let s = Sphere { radius: 1.0, col_divisions: 32, row_divisions: 32 };
+                             s.as_mesh()
+                        }
+                    };
+
+                    // 转换格式 (为了 Glium)
+                    let vertex_data: Vec<Vertex> = mesh_data.vertices
+                        .iter()
+                        .map(|v| Vertex { position: *v })
+                        .collect();
+
+                    let normal_data: Vec<Normal> = mesh_data.normals
+                        .iter()
+                        .map(|n| Normal { normal: *n })
+                        .collect();
+
+                    // 传给显卡
+                    let positions = glium::VertexBuffer::new(&display, &vertex_data).unwrap();
+                    let normals = glium::VertexBuffer::new(&display, &normal_data).unwrap();
+                    let indices = glium::IndexBuffer::new(
+                        &display,
+                        glium::index::PrimitiveType::TrianglesList,
+                        &mesh_data.indices,
+                    ).unwrap();
                     
                     target.draw((&positions, &normals), &indices, &phong_program,
                                 &uniform! { model: model, view: view, perspective: perspective,
