@@ -13,7 +13,7 @@ use imgui::FontConfig;
 use imgui::FontGlyphRanges;
 use imgui::FontSource;
 use std::time::Instant;
-use cg_coop::shape::mesh::AsMesh; 
+use cg_coop::shape::mesh::{AsMesh, Mesh};
 use cg_coop::shape::{cube::Cube, sphere::Sphere, cylinder::Cylinder, cone::Cone};
 
 fn _print_type<T>(_: &T) {
@@ -166,6 +166,9 @@ fn main() {
     let mut cy_height = 2.0f32;      // 高度
     let mut cy_sectors = 6i32;       // 切分份数
 
+    // 初始值为 None，表示还没加载任何东西
+    let mut loaded_custom_mesh: Option<cg_coop::shape::mesh::Mesh> = None;
+
     // 形状选择器
     let mut shape_type = 4; // 默认选中棱台看效果
 
@@ -254,6 +257,55 @@ fn main() {
                 }
                 WindowEvent::RedrawRequested => {
                     // 请求重绘
+
+                    // 每一帧都根据最新参数生成模型，根据 shape_type 动态决定画什么
+                    let mesh_data = match shape_type {
+                        0 => { // Cube
+                             let s = Cube { width: cy_radius * 2.0, height: cy_radius * 2.0, depth: cy_radius * 2.0 };
+                             s.as_mesh()
+                        },
+                        1 => { // Sphere
+                             let s = Sphere { radius: cy_radius, col_divisions: cy_sectors as u16, row_divisions: cy_sectors as u16 };
+                             s.as_mesh()
+                        },
+                        2 => { // Cylinder
+                             let s = Cylinder { 
+                                 bottom_radius: cy_radius, 
+                                 top_radius: cy_radius, 
+                                 height: cy_height, 
+                                 sectors: cy_sectors as u16 
+                             };
+                             s.as_mesh()
+                        },
+                        3 => { // Cone
+                             let s = Cone { radius: cy_radius, height: cy_height, sectors: cy_sectors as u16 };
+                             s.as_mesh()
+                        },
+                        4 => { // Frustum (多面棱台)
+                             let s = Cylinder { 
+                                 bottom_radius: cy_radius, 
+                                 top_radius: cy_top_radius, // 使用独立的顶面半径
+                                 height: cy_height, 
+                                 sectors: cy_sectors as u16 
+                             };
+                             s.as_mesh()
+                        },
+                        // 如果有加载的模型，就显示它；否则显示一个默认球体作为占位
+                        5 => {
+                             if let Some(ref mesh) = loaded_custom_mesh {
+                                 mesh.clone() // 把加载的数据拿出来渲染
+                             } else {
+                                 // 如果还没加载，就画个小球意思一下
+                                 let s = Sphere { radius: 0.5, col_divisions: 16, row_divisions: 16 };
+                                 s.as_mesh()
+                             }
+                        },
+                        _ => {
+                             let s = Sphere { radius: 1.0, col_divisions: 32, row_divisions: 32 };
+                             s.as_mesh()
+                        }
+                    };
+
                     let mut target = display.draw();
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
                     if camera.move_state == camera::MoveState::PanObit {
@@ -293,6 +345,33 @@ fn main() {
                         ui.radio_button("圆柱 (Cylinder)", &mut shape_type, 2);
                         ui.radio_button("圆锥 (Cone)", &mut shape_type, 3);
                         ui.radio_button("多面棱台/棱柱 (Frustum/Prism)", &mut shape_type, 4);
+
+                        ui.separator();
+                        ui.text("文件操作 (File)");
+
+                        if ui.button("保存当前模型 (Save .obj)") {
+                            match mesh_data.save_obj("output.obj") {
+                                Ok(_) => println!("保存成功: output.obj"),
+                                Err(e) => println!("保存失败: {}", e),
+                            }
+                        }
+                        
+                        // 加载按钮 
+                        if ui.button("加载模型 (Load .obj)") {
+                            // 使用全路径调用，避免引用错误
+                            match cg_coop::shape::mesh::Mesh::load_obj("output.obj") {
+                                Ok(loaded_mesh) => {
+                                    println!("加载成功! 包含 {} 个顶点", loaded_mesh.vertices.len());
+                                    
+                                    // 1. 把加载的数据存到我们第一步定义的变量里
+                                    loaded_custom_mesh = Some(loaded_mesh);
+                                    
+                                    // 2. 自动把视图切换到模式 5
+                                    shape_type = 5; 
+                                },
+                                Err(e) => println!("加载失败: {}", e),
+                            }
+                        }
                         
                         ui.separator();
                         ui.text("参数调整 (Parameters)");
@@ -360,45 +439,6 @@ fn main() {
                     light_ubo.write(&l_block);
                     material_ubo.write(&m_block);
                     let light = [-1.0, 0.4, 0.9f32];
-
-                    // 每一帧都根据最新参数生成模型，根据 shape_type 动态决定画什么
-                    let mesh_data = match shape_type {
-                        0 => { // Cube
-                             let s = Cube { width: cy_radius * 2.0, height: cy_radius * 2.0, depth: cy_radius * 2.0 };
-                             s.as_mesh()
-                        },
-                        1 => { // Sphere
-                             let s = Sphere { radius: cy_radius, col_divisions: cy_sectors as u16, row_divisions: cy_sectors as u16 };
-                             s.as_mesh()
-                        },
-                        2 => { // Cylinder
-                             let s = Cylinder { 
-                                 bottom_radius: cy_radius, 
-                                 top_radius: cy_radius, 
-                                 height: cy_height, 
-                                 sectors: cy_sectors as u16 
-                             };
-                             s.as_mesh()
-                        },
-                        3 => { // Cone
-                             let s = Cone { radius: cy_radius, height: cy_height, sectors: cy_sectors as u16 };
-                             s.as_mesh()
-                        },
-                        4 => { // Frustum (多面棱台)
-                             let s = Cylinder { 
-                                 bottom_radius: cy_radius, 
-                                 top_radius: cy_top_radius, // 使用独立的顶面半径
-                                 height: cy_height, 
-                                 sectors: cy_sectors as u16 
-                             };
-                             s.as_mesh()
-                        },
-                        _ => {
-                             let s = Sphere { radius: 1.0, col_divisions: 32, row_divisions: 32 };
-                             s.as_mesh()
-                        }
-                    };
-
                     // 转换格式 (为了 Glium)
                     let vertex_data: Vec<Vertex> = mesh_data.vertices
                         .iter()
