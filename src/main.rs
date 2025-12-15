@@ -15,6 +15,7 @@ use imgui::FontSource;
 use std::time::Instant;
 use cg_coop::shape::mesh::{AsMesh, Mesh};
 use cg_coop::shape::{cube::Cube, sphere::Sphere, cylinder::Cylinder, cone::Cone};
+use cg_coop::shape::nurbs::NurbsSurface;
 
 fn _print_type<T>(_: &T) {
     println!("{}", std::any::type_name::<T>());
@@ -168,9 +169,25 @@ fn main() {
 
     // 初始值为 None，表示还没加载任何东西
     let mut loaded_custom_mesh: Option<cg_coop::shape::mesh::Mesh> = None;
-
+    
     // 形状选择器
-    let mut shape_type = 4; // 默认选中棱台看效果
+    let mut shape_type = 4; // 默认选中棱台看效
+
+    // 定义 NURBS 初始状态 
+    // 创建一个 4x4 的波浪形控制点网格
+    let mut nurbs_degree = 3;
+    let mut nurbs_pts = vec![
+        // Row 0 (y=0)
+        [-1.5, 0.0, -1.5], [-0.5, 0.5, -1.5], [0.5, 0.5, -1.5], [1.5, 0.0, -1.5],
+        // Row 1 (y=0.5)
+        [-1.5, 0.5, -0.5], [-0.5, 1.5, -0.5], [0.5, 1.5, -0.5], [1.5, 0.5, -0.5],
+        // Row 2 (y=0.5)
+        [-1.5, 0.5,  0.5], [-0.5, 1.5,  0.5], [0.5, 1.5,  0.5], [1.5, 0.5,  0.5],
+        // Row 3 (y=0)
+        [-1.5, 0.0,  1.5], [-0.5, 0.5,  1.5], [0.5, 0.5,  1.5], [1.5, 0.0,  1.5],
+    ];
+    // 权重全部初始化为 1.0 
+    let mut nurbs_weights = vec![1.0f32; 16];
 
     // 通过调用 shader库中的 create_shader 函数来创建着色器程序
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
@@ -300,6 +317,17 @@ fn main() {
                                  s.as_mesh()
                              }
                         },
+                        6 => { // NURBS
+                             let s = NurbsSurface {
+                                 control_points: nurbs_pts.clone(), // 传入当前编辑的点
+                                 weights: nurbs_weights.clone(),
+                                 u_count: 4,
+                                 v_count: 4,
+                                 degree: nurbs_degree,
+                                 splits: 32, // 渲染精度
+                             };
+                             s.as_mesh()
+                        },
                         _ => {
                              let s = Sphere { radius: 1.0, col_divisions: 32, row_divisions: 32 };
                              s.as_mesh()
@@ -345,6 +373,8 @@ fn main() {
                         ui.radio_button("圆柱 (Cylinder)", &mut shape_type, 2);
                         ui.radio_button("圆锥 (Cone)", &mut shape_type, 3);
                         ui.radio_button("多面棱台/棱柱 (Frustum/Prism)", &mut shape_type, 4);
+                        ui.radio_button("导入模型 (Import Model)", &mut shape_type, 5);
+                        ui.radio_button("NURBS 曲面 (NURBS Surface)", &mut shape_type, 6);
 
                         ui.separator();
                         ui.text("文件操作 (File)");
@@ -398,6 +428,18 @@ fn main() {
                                 ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
                                 ui.slider("侧面数 (Sides)", 3, 64, &mut cy_sectors); // 限制在3-64
                             },
+                            6 => { // NURBS
+                            ui.text("控制点编辑 (Control Points)");
+                            // 简单的 UI：只让动中间 4 个点，防止 UI 太乱
+                            ui.slider("Point [1,1] Height", -2.0, 3.0, &mut nurbs_pts[5][1]); // 修改第5个点的Y
+                            ui.slider("Point [1,2] Height", -2.0, 3.0, &mut nurbs_pts[6][1]); // 修改第6个点的Y
+                            ui.slider("Point [2,1] Height", -2.0, 3.0, &mut nurbs_pts[9][1]); 
+                            ui.slider("Point [2,2] Height", -2.0, 3.0, &mut nurbs_pts[10][1]);
+
+                            ui.separator();
+                            ui.text("权重控制 (Weights - R in NURBS)");
+                            ui.slider("Point [1,1] Weight", 0.1, 5.0, &mut nurbs_weights[5]);
+                        },
                             _ => {} // Cube 不需要参数
                         }
                     });
