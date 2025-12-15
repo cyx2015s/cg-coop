@@ -1,4 +1,4 @@
-mod scene; // 确保有这个模块
+mod scene;
 
 use cg_coop::base::keystate::InputState;
 use cg_coop::base::light::{Light, LightBlock, AmbientLight, DirectionalLight, PointLight, SpotLight};
@@ -13,10 +13,8 @@ use imgui::{Condition, FontConfig, FontGlyphRanges, FontSource, Drag}; // 引入
 use std::time::Instant;
 use cg_coop::shape::mesh::{AsMesh, Mesh};
 
-// 引入 scene 模块
 use scene::{Scene, GameObject, ShapeKind};
 
-// --- 保留原有的 Vertex 定义以兼容 shader ---
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 3],
@@ -30,14 +28,14 @@ struct Normal {
 implement_vertex!(Normal, normal);
 
 fn main() {
-    // === 初始化资源路径 ===
+    // 初始化资源路径
     let phong_vertex_path = "assets/shaders/Phong.vert";
     let phong_fragment_path = "assets/shaders/Phong.frag";
     
     // 默认材质
     let default_mat = material::Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_Material();
 
-    // === 恢复：队友的灯光初始化 ===
+    // 灯光初始化
     let mut ambient_light = AmbientLight::new(0.2);
     let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
@@ -47,10 +45,10 @@ fn main() {
         position: [0.0, 5.0, 0.0], direction: [0.0, -1.0, 0.0], intensity: 10.0, color: [1.0, 1.0, 1.0],
         angle: 30.0, kc: 1.0, kl: 0.09, kq: 10.2,
     };
-    // 材质变量（用于UI绑定）
+    // 材质变量
     let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]); // 仅用于UI演示
 
-    // === 系统初始化 ===
+    // 系统初始化
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
     let global_ctx = cg_coop::ctx::GlobalContext { ui_ctx: imgui::Context::create() };
@@ -90,7 +88,7 @@ fn main() {
 
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
 
-    // === 场景初始化 ===
+    // 场景初始化
     let mut scene = Scene::new();
 
     // 默认添加地板
@@ -172,7 +170,6 @@ fn main() {
                     if camera.move_state == camera::MoveState::PanObit {
                         let current_time = Instant::now();
                         let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
-                        // 注意：last_frame_time 在下面 AboutToWait 也会更新，这里仅用于计算
                         camera.update_pan_obit(delta_time);
                     }
 
@@ -181,23 +178,18 @@ fn main() {
                     let ui = ui_ctx.frame();
                     let _cn_font = ui.push_font(cn_font);
 
-                    // ==========================================
-                    // === 找回消失的 Demo 窗口 ===
-                    // ==========================================
-                    ui.show_demo_window(&mut true); // <--- 加上这一行！
 
-                    // ==========================================
-                    // === 1. 恢复：队友的“操作说明”窗口 ===
-                    // ==========================================
+                    ui.show_demo_window(&mut true); 
+
+                    // 操作说明
+
                     ui.window("操作说明")
                         .size([300.0, 100.0], Condition::FirstUseEver)
                         .build(|| {
                             ui.text_wrapped("按V键漫游\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
                         });
 
-                    // ==========================================
-                    // === 2. 恢复：队友的“灯光与材质测试”窗口 ===
-                    // ==========================================
+                    // 灯光与材质测试
                     ui.window("灯光与材质测试").size([400.0, 200.0], Condition::FirstUseEver).build(|| {
                         ui.slider("环境光强度", 0.0, 1.0, &mut ambient_light.intensity);
                         ui.slider("平行光强度", 0.0, 5.0, &mut directional_light.intensity);
@@ -215,9 +207,7 @@ fn main() {
                         ui.color_edit3("材质 kd", &mut lambertian.kd);
                     });
 
-                    // ==========================================
-                    // === 3. 场景列表 (Scene List) ===
-                    // ==========================================
+                    // 场景列表
                     ui.window("场景列表 (Scene List)").size([200.0, 400.0], Condition::FirstUseEver).position([20.0, 150.0], Condition::FirstUseEver).build(|| {
                         ui.text("基础形状:");
                         if ui.button("立方体") {
@@ -262,9 +252,7 @@ fn main() {
                         }
                     });
 
-                    // ==========================================
-                    // === 4. 属性面板 (Inspector) ===
-                    // ==========================================
+                    // 属性面板
                     if let Some(obj) = scene.get_selected_mut() {
                         ui.window("属性面板 (Inspector)").size([250.0, 400.0], Condition::FirstUseEver).position([240.0, 150.0], Condition::FirstUseEver).build(|| {
                             ui.text_colored([0.0, 1.0, 0.0, 1.0], &format!("当前选中: {}", obj.name));
@@ -281,7 +269,6 @@ fn main() {
                                 obj.transform.scale = scale.into();
                             }
 
-                            // 旋转涉及到四元数，简单起见我们这里提供重置
                             if ui.button("重置旋转") {
                                 obj.transform.rotation = glam::f32::Quat::IDENTITY;
                             }
@@ -301,7 +288,7 @@ fn main() {
                                     let mut s = *sectors as i32;
                                     if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
                                 },
-                                // 更新：Cylinder 现在处理 圆柱、棱柱、棱台
+                                // Cylinder 现在处理 圆柱、棱柱、棱台
                                 ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
                                     ui.text("几何尺寸:");
                                     if Drag::new("顶半径").speed(0.05).build(ui, top_radius) { need_regen = true; }
@@ -310,7 +297,7 @@ fn main() {
                                     
                                     ui.separator();
                                     ui.text("边数控制 (棱柱调节这里):");
-                                    // 重点：棱柱就是边数很少的圆柱
+                                    // 棱柱就是边数很少的圆柱
                                     let mut s = *sectors as i32;
                                     if ui.slider("精度/边数", 3, 64, &mut s) { 
                                         *sectors = s as u16; 
@@ -320,7 +307,7 @@ fn main() {
                                         ui.text_colored([1.0, 1.0, 0.0, 1.0], "提示: 低精度即为棱柱/棱台");
                                     }
                                 },
-                                // 更新：圆锥面板
+                                // 圆锥面板
                                 ShapeKind::Cone { radius, height, sectors } => {
                                     if Drag::new("底半径").speed(0.05).build(ui, radius) { need_regen = true; }
                                     if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
@@ -342,7 +329,7 @@ fn main() {
                         });
                     }
 
-                    // === 渲染循环 (遍历场景) ===
+                    // 渲染循环 (遍历场景) 
                     let mut l_block = LightBlock { lights: [Light::default(); 32], num_lights: 0 };
                     l_block.lights[0] = ambient_light.to_Light(); l_block.num_lights += 1;
                     l_block.lights[1] = directional_light.to_Light(); l_block.num_lights += 1;
