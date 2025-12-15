@@ -27,6 +27,7 @@ pub struct GameObject {
     pub mesh: Mesh,
     pub kind: ShapeKind,
     pub visible: bool,
+    pub use_texture: bool,
 }
 
 impl GameObject {
@@ -35,9 +36,10 @@ impl GameObject {
             name: name.to_string(),
             transform: Transform::default(),
             material,
-            mesh: Mesh { vertices: vec![], normals: vec![], indices: vec![] },
+            mesh: Mesh { vertices: vec![], normals: vec![], tex_coords: vec![], indices: vec![] },
             kind,
             visible: true,
+            use_texture: false,
         };
         obj.regenerate_mesh();
         obj
@@ -69,7 +71,6 @@ impl GameObject {
             ShapeKind::Imported => {
                 self.mesh.clone() 
             },
-            //NURBS 生成逻辑 
             ShapeKind::Nurbs { degree, control_points, weights, u_count, v_count } => {
                  let s = NurbsSurface {
                      control_points: control_points.clone(),
@@ -77,7 +78,7 @@ impl GameObject {
                      u_count: *u_count,
                      v_count: *v_count,
                      degree: *degree,
-                     splits: 32, // 渲染精度固定为 32
+                     splits: 32, 
                  };
                  s.as_mesh()
             },

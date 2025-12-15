@@ -10,15 +10,18 @@ impl AsMesh for Sphere {
     fn as_mesh(&self) -> crate::shape::mesh::Mesh {
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
+        let mut tex_coords = Vec::new();
         let mut indices = Vec::new();
 
         for row in 0..=self.row_divisions {
-            let theta = std::f32::consts::PI * (row as f32) / (self.row_divisions as f32);
+            let v = row as f32 / self.row_divisions as f32; // V 坐标 (0~1)
+            let theta = std::f32::consts::PI * v;
             let sin_theta = theta.sin();
             let cos_theta = theta.cos();
 
             for col in 0..=self.col_divisions {
-                let phi = 2.0 * std::f32::consts::PI * (col as f32) / (self.col_divisions as f32);
+                let u = col as f32 / self.col_divisions as f32; // U 坐标 (0~1)
+                let phi = 2.0 * std::f32::consts::PI * u;
                 let sin_phi = phi.sin();
                 let cos_phi = phi.cos();
 
@@ -28,6 +31,7 @@ impl AsMesh for Sphere {
 
                 vertices.push([x, y, z]);
                 normals.push([x / self.radius, y / self.radius, z / self.radius]);
+                tex_coords.push([u, 1.0 - v]);
             }
         }
 
@@ -49,6 +53,7 @@ impl AsMesh for Sphere {
         crate::shape::mesh::Mesh {
             vertices,
             normals,
+            tex_coords,
             indices,
         }
     }

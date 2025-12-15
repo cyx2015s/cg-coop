@@ -12,41 +12,48 @@ impl AsMesh for Cube {
         let h = self.height / 2.0;
         let d = self.depth / 2.0;
 
-        // 定义 24 个顶点 (6面 * 4点)
-        // 每个面一组，顺序为：左下，右下，右上，左上 
-        let raw_vertices = vec![
-            // Front face (z = +d)
-            [-w, -h,  d], [ w, -h,  d], [ w,  h,  d], [-w,  h,  d],
-            // Back face (z = -d)
-            [ w, -h, -d], [-w, -h, -d], [-w,  h, -d], [ w,  h, -d],
-            // Top face (y = +h)
-            [-w,  h,  d], [ w,  h,  d], [ w,  h, -d], [-w,  h, -d],
-            // Bottom face (y = -h)
-            [-w, -h, -d], [ w, -h, -d], [ w, -h,  d], [-w, -h,  d],
-            // Right face (x = +w)
-            [ w, -h,  d], [ w, -h, -d], [ w,  h, -d], [ w,  h,  d],
-            // Left face (x = -w)
-            [-w, -h, -d], [-w, -h,  d], [-w,  h,  d], [-w,  h, -d],
-        ];
+        let mut vertices = Vec::new();
+        let mut normals = Vec::new();
+        let mut tex_coords = Vec::new();
+        let mut indices = Vec::new();
 
-        // 对应的法线 (24 个)
-        let raw_normals = vec![
-            // Front (0, 0, 1)
-            [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0],
-            // Back (0, 0, -1)
-            [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0],
-            // Top (0, 1, 0)
-            [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-            // Bottom (0, -1, 0)
-            [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0],
-            // Right (1, 0, 0)
-            [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0],
-            // Left (-1, 0, 0)
-            [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
-        ];
+        // Front Face (Z+) 
+        vertices.push([-w, -h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([0.0, 0.0]); 
+        vertices.push([ w, -h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([1.0, 0.0]); 
+        vertices.push([ w,  h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([1.0, 1.0]); 
+        vertices.push([-w,  h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([0.0, 1.0]); 
+        
+        // Back Face (Z-)
+        vertices.push([ w, -h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([0.0, 0.0]);
+        vertices.push([-w, -h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([1.0, 0.0]);
+        vertices.push([-w,  h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([1.0, 1.0]);
+        vertices.push([ w,  h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([0.0, 1.0]);
 
-        // 索引
-        let mut indices: Vec<u16> = Vec::new();
+        // Top Face (Y+) 
+        vertices.push([-w,  h,  d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([0.0, 0.0]);
+        vertices.push([ w,  h,  d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([1.0, 0.0]);
+        vertices.push([ w,  h, -d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([1.0, 1.0]);
+        vertices.push([-w,  h, -d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([0.0, 1.0]);
+
+        // Bottom Face (Y-)
+        vertices.push([-w, -h, -d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([0.0, 0.0]);
+        vertices.push([ w, -h, -d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([1.0, 0.0]);
+        vertices.push([ w, -h,  d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([1.0, 1.0]);
+        vertices.push([-w, -h,  d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([0.0, 1.0]);
+
+        // Right Face (X+) 
+        vertices.push([ w, -h,  d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([0.0, 0.0]);
+        vertices.push([ w, -h, -d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([1.0, 0.0]);
+        vertices.push([ w,  h, -d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([1.0, 1.0]);
+        vertices.push([ w,  h,  d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([0.0, 1.0]);
+
+        // Left Face (X-)
+        vertices.push([-w, -h, -d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([0.0, 0.0]);
+        vertices.push([-w, -h,  d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([1.0, 0.0]);
+        vertices.push([-w,  h,  d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([1.0, 1.0]);
+        vertices.push([-w,  h, -d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([0.0, 1.0]);
+
+        // Indices 生成
         for face in 0..6 {
             let start = face * 4;
             // Triangle 1
@@ -60,8 +67,9 @@ impl AsMesh for Cube {
         }
 
         Mesh {
-            vertices: raw_vertices,
-            normals: raw_normals,
+            vertices,
+            normals,
+            tex_coords,
             indices,
         }
     }
