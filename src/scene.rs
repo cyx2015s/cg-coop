@@ -2,16 +2,22 @@ use cg_coop::base::material::{self, Material};
 use cg_coop::base::transform::Transform;
 use cg_coop::shape::mesh::{Mesh, AsMesh};
 use cg_coop::shape::{cube::Cube, sphere::Sphere, cylinder::Cylinder, cone::Cone};
+use cg_coop::shape::nurbs::NurbsSurface;
 
 #[derive(Clone)]
 pub enum ShapeKind {
     Cube { width: f32, height: f32, depth: f32 },
     Sphere { radius: f32, sectors: u16 },
-    // 将 radius 改为 top/bottom 两个半径，这样就能表示圆柱、棱台、棱柱
     Cylinder { top_radius: f32, bottom_radius: f32, height: f32, sectors: u16 },
-    // 确保圆锥存在
     Cone { radius: f32, height: f32, sectors: u16 },
     Imported, 
+    Nurbs { 
+        degree: usize, 
+        control_points: Vec<[f32; 3]>, 
+        weights: Vec<f32>,
+        u_count: usize,
+        v_count: usize
+    },
 }
 
 pub struct GameObject {
@@ -47,7 +53,6 @@ impl GameObject {
                 let s = Sphere { radius: *radius, col_divisions: *sectors, row_divisions: *sectors };
                 s.as_mesh()
             },
-            // 支持不等径圆柱（即棱台）
             ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
                 let s = Cylinder { 
                     bottom_radius: *bottom_radius, 
@@ -63,6 +68,18 @@ impl GameObject {
             },
             ShapeKind::Imported => {
                 self.mesh.clone() 
+            },
+            //NURBS 生成逻辑 
+            ShapeKind::Nurbs { degree, control_points, weights, u_count, v_count } => {
+                 let s = NurbsSurface {
+                     control_points: control_points.clone(),
+                     weights: weights.clone(),
+                     u_count: *u_count,
+                     v_count: *v_count,
+                     degree: *degree,
+                     splits: 32, // 渲染精度固定为 32
+                 };
+                 s.as_mesh()
             },
         };
     }

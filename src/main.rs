@@ -91,6 +91,20 @@ fn main() {
     // 场景初始化
     let mut scene = Scene::new();
 
+    // 预备一个用于显示控制点的微型球体
+    let debug_sphere_mesh = cg_coop::shape::sphere::Sphere { 
+        radius: 0.05, col_divisions: 8, row_divisions: 8 
+    }.as_mesh();
+
+    let debug_sphere_verts: Vec<Vertex> = debug_sphere_mesh.vertices.iter().map(|v| Vertex { position: *v }).collect();
+    let debug_sphere_norms: Vec<Normal> = debug_sphere_mesh.normals.iter().map(|n| Normal { normal: *n }).collect();
+    let debug_sphere_vbo = glium::VertexBuffer::new(&display, &debug_sphere_verts).unwrap();
+    let debug_sphere_nbo = glium::VertexBuffer::new(&display, &debug_sphere_norms).unwrap();
+    let debug_sphere_ibo = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &debug_sphere_mesh.indices).unwrap();
+
+    // 用于 UI 记录当前选中的 NURBS 控制点索引 
+    let mut current_nurbs_idx: i32 = 0;
+
     // 默认添加地板
     let mut floor = GameObject::new("Floor", ShapeKind::Cube{ width: 10.0, height: 0.1, depth: 10.0 }, default_mat);
     floor.transform.position.y = -1.0;
@@ -231,6 +245,23 @@ fn main() {
                             scene.add_object(GameObject::new("Cone", ShapeKind::Cone{radius:0.5, height:1.0, sectors:32}, default_mat));
                         }
 
+                        ui.separator();
+                        ui.text("高级建模:");
+                        // 添加 NURBS 按钮
+                        if ui.button("NURBS 曲面") {
+                            // 初始化一个 4x4 的波浪形控制点
+                            let pts = vec![
+                                [-1.5, 0.0, -1.5], [-0.5, 0.5, -1.5], [0.5, 0.5, -1.5], [1.5, 0.0, -1.5],
+                                [-1.5, 0.5, -0.5], [-0.5, 1.5, -0.5], [0.5, 1.5, -0.5], [1.5, 0.5, -0.5], // 中间凸起
+                                [-1.5, 0.5,  0.5], [-0.5, 1.5,  0.5], [0.5, 1.5,  0.5], [1.5, 0.5,  0.5],
+                                [-1.5, 0.0,  1.5], [-0.5, 0.5,  1.5], [0.5, 0.5,  1.5], [1.5, 0.0,  1.5],
+                            ];
+                            let weights = vec![1.0; 16];
+                            scene.add_object(GameObject::new("Nurbs Surface", ShapeKind::Nurbs{
+                                degree: 3, control_points: pts, weights, u_count: 4, v_count: 4
+                            }, default_mat));
+                        }
+
                         ui.text("其他:");
                         if ui.button("导入模型") {
                             if let Ok(mesh) = Mesh::load_obj("output.obj") {
@@ -252,26 +283,18 @@ fn main() {
                         }
                     });
 
-                    // 属性面板
+                    // 属性面板 
                     if let Some(obj) = scene.get_selected_mut() {
-                        ui.window("属性面板 (Inspector)").size([250.0, 400.0], Condition::FirstUseEver).position([240.0, 150.0], Condition::FirstUseEver).build(|| {
+                        ui.window("属性面板 (Inspector)").size([250.0, 500.0], Condition::FirstUseEver).position([240.0, 150.0], Condition::FirstUseEver).build(|| {
                             ui.text_colored([0.0, 1.0, 0.0, 1.0], &format!("当前选中: {}", obj.name));
                             ui.separator();
 
                             ui.text("变换 (Transform)");
                             let mut pos = obj.transform.position.to_array();
-                            if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
-                                obj.transform.position = pos.into();
-                            }
-                            
+                            if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) { obj.transform.position = pos.into(); }
                             let mut scale = obj.transform.scale.to_array();
-                            if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) {
-                                obj.transform.scale = scale.into();
-                            }
-
-                            if ui.button("重置旋转") {
-                                obj.transform.rotation = glam::f32::Quat::IDENTITY;
-                            }
+                            if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) { obj.transform.scale = scale.into(); }
+                            if ui.button("重置旋转") { obj.transform.rotation = glam::f32::Quat::IDENTITY; }
 
                             ui.separator();
                             ui.text("形状参数 (Parameters)");
@@ -288,31 +311,39 @@ fn main() {
                                     let mut s = *sectors as i32;
                                     if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
                                 },
-                                // Cylinder 现在处理 圆柱、棱柱、棱台
                                 ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
-                                    ui.text("几何尺寸:");
                                     if Drag::new("顶半径").speed(0.05).build(ui, top_radius) { need_regen = true; }
                                     if Drag::new("底半径").speed(0.05).build(ui, bottom_radius) { need_regen = true; }
                                     if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
-                                    
-                                    ui.separator();
-                                    ui.text("边数控制 (棱柱调节这里):");
-                                    // 棱柱就是边数很少的圆柱
                                     let mut s = *sectors as i32;
-                                    if ui.slider("精度/边数", 3, 64, &mut s) { 
-                                        *sectors = s as u16; 
-                                        need_regen = true; 
-                                    }
-                                    if *sectors < 5 {
-                                        ui.text_colored([1.0, 1.0, 0.0, 1.0], "提示: 低精度即为棱柱/棱台");
-                                    }
+                                    if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
                                 },
-                                // 圆锥面板
                                 ShapeKind::Cone { radius, height, sectors } => {
                                     if Drag::new("底半径").speed(0.05).build(ui, radius) { need_regen = true; }
                                     if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
                                     let mut s = *sectors as i32;
                                     if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
+                                },
+                                // NURBS 编辑器
+                                ShapeKind::Nurbs { control_points, weights, .. } => {
+                                    ui.text("NURBS 控制点编辑");
+                                    ui.text("1. 选择控制点 (0-15)");
+                                    // 简单的滑块来选择当前编辑哪个点
+                                    ui.slider("点索引", 0, 15, &mut current_nurbs_idx);
+                                    
+                                    let idx = current_nurbs_idx as usize;
+                                    if idx < control_points.len() {
+                                        ui.text_colored([1.0, 1.0, 0.0, 1.0], &format!("正在编辑点 [{}]", idx));
+                                        
+                                        // 编辑坐标 X Y Z
+                                        if Drag::new("X坐标").speed(0.05).build(ui, &mut control_points[idx][0]) { need_regen = true; }
+                                        if Drag::new("Y坐标").speed(0.05).build(ui, &mut control_points[idx][1]) { need_regen = true; }
+                                        if Drag::new("Z坐标").speed(0.05).build(ui, &mut control_points[idx][2]) { need_regen = true; }
+                                        
+                                        ui.separator();
+                                        // 编辑权重
+                                        if Drag::new("权重(W)").speed(0.05).range(0.1, 100.0).build(ui, &mut weights[idx]) { need_regen = true; }
+                                    }
                                 },
                                 _ => {}
                             }
@@ -375,6 +406,44 @@ fn main() {
                                 Light_Block: &light_ubo,
                             },
                             &params).unwrap();
+
+                        // NURBS 控制点可视化
+                        if let ShapeKind::Nurbs { control_points, .. } = &obj.kind {
+                            // 只有当这个物体被选中时，才画出控制点
+                            if scene.selected_index == Some(scene.objects.iter().position(|x| std::ptr::eq(x, obj)).unwrap_or(999)) {
+                                
+                                for (idx, pt) in control_points.iter().enumerate() {
+                                    // 1. 计算控制点的世界坐标
+                                    // 先把点转成 glam::Vec3，然后应用物体的变换矩阵
+                                    let pt_local = glam::f32::Vec3::from(*pt);
+                                    let obj_matrix = obj.transform.get_matrix(); 
+                                    let world_pos = obj_matrix.transform_point3(pt_local);
+
+                                    // 2. 构建小球的 Model 矩阵 (只包含位移)
+                                    let sphere_model = glam::f32::Mat4::from_translation(world_pos).to_cols_array_2d();
+
+                                    // 3. 决定颜色：当前编辑的点(黄色)，其他点(红色)
+                                    let is_active = idx == current_nurbs_idx as usize;
+                                    let debug_color = if is_active { [1.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] }; // 黄 vs 红
+                                    
+                                    let debug_mat = material::Phong::new(debug_color, debug_color, [0.0,0.0,0.0], 1.0).to_Material();
+                                    let debug_m_block = material::MaterialBlock { material: debug_mat };
+                                    material_ubo.write(&debug_m_block);
+
+                                    // 4. 绘制小球
+                                    target.draw((&debug_sphere_vbo, &debug_sphere_nbo), &debug_sphere_ibo, &phong_program,
+                                        &uniform! { 
+                                            model: sphere_model, 
+                                            view: view, 
+                                            perspective: perspective,
+                                            viewPos: viewPos,
+                                            Material_Block: &material_ubo, // 使用刚才定义的颜色
+                                            Light_Block: &light_ubo,
+                                        },
+                                        &params).unwrap();
+                                }
+                            }
+                        }
                     }
 
                     _cn_font.pop();
