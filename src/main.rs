@@ -1,4 +1,5 @@
-use cg_coop::base::cube;
+mod scene; // 确保有这个模块
+
 use cg_coop::base::keystate::InputState;
 use cg_coop::base::light::{Light, LightBlock, AmbientLight, DirectionalLight, PointLight, SpotLight};
 use cg_coop::base::material;
@@ -8,19 +9,14 @@ use cg_coop::shader;
 use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
-use imgui::Condition;
-use imgui::FontConfig;
-use imgui::FontGlyphRanges;
-use imgui::FontSource;
+use imgui::{Condition, FontConfig, FontGlyphRanges, FontSource, Drag}; // 引入 Drag
 use std::time::Instant;
 use cg_coop::shape::mesh::{AsMesh, Mesh};
-use cg_coop::shape::{cube::Cube, sphere::Sphere, cylinder::Cylinder, cone::Cone};
-use cg_coop::shape::nurbs::NurbsSurface;
 
-fn _print_type<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>());
-}
+// 引入 scene 模块
+use scene::{Scene, GameObject, ShapeKind};
 
+// --- 保留原有的 Vertex 定义以兼容 shader ---
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 3],
@@ -34,223 +30,117 @@ struct Normal {
 implement_vertex!(Normal, normal);
 
 fn main() {
-
-    // 定义着色器的路径
+    // === 初始化资源路径 ===
     let phong_vertex_path = "assets/shaders/Phong.vert";
     let phong_fragment_path = "assets/shaders/Phong.frag";
+    
+    // 默认材质
+    let default_mat = material::Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_Material();
 
-    let lambert_vertex_path = "assets/shaders/Lambert.vert";
-    let lambert_fragment_path = "assets/shaders/Lambert.frag";
-    // 定义灯光和材质
-    let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
-    let mut phong = material::Phong::new([1.0, 0.03, 0.03], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0], 10.0);
+    // === 恢复：队友的灯光初始化 ===
     let mut ambient_light = AmbientLight::new(0.2);
-    let mut directional_light =
-        DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
+    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
-        position: [2.0, 2.0, 2.0],
-        intensity: 0.0,
-        color: [1.0, 1.0, 1.0],
-        kc: 1.0,
-        kl: 0.09,
-        kq: 0.032,
+        position: [2.0, 2.0, 2.0], intensity: 0.0, color: [1.0, 1.0, 1.0], kc: 1.0, kl: 0.09, kq: 0.032,
     };
     let mut spot_light = SpotLight {
-        position: [0.0, 5.0, 0.0],
-        direction: [0.0, -1.0, 0.0],
-        intensity: 10.0,
-        color: [1.0, 1.0, 1.0],
-        angle: 30.0,
-        kc: 1.0,
-        kl: 0.09,
-        kq: 10.2,
+        position: [0.0, 5.0, 0.0], direction: [0.0, -1.0, 0.0], intensity: 10.0, color: [1.0, 1.0, 1.0],
+        angle: 30.0, kc: 1.0, kl: 0.09, kq: 10.2,
     };
+    // 材质变量（用于UI绑定）
+    let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]); // 仅用于UI演示
 
-    // 定义时间戳
+    // === 系统初始化 ===
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
-    let ui_last_frame_time = Instant::now();
+    let global_ctx = cg_coop::ctx::GlobalContext { ui_ctx: imgui::Context::create() };
 
-    let global_ctx = cg_coop::ctx::GlobalContext {
-        ui_ctx: imgui::Context::create(),
-    };
-
-    // 启动
     let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
-        .with_title("Project")
+        .with_title("Project - Mini Blender Mode")
         .build(&event_loop);
 
-    let mut light_block = LightBlock { 
-        lights: [Light::default(); 32],
-        num_lights: 0,
-    };
-
-    let mut material_block = material::MaterialBlock {
-        material: material::Material::default(),
-    };
-
+    // Uniform Buffers
+    let light_block = LightBlock { lights: [Light::default(); 32], num_lights: 0 };
+    let material_block = material::MaterialBlock { material: material::Material::default() };
     let light_ubo = glium::uniforms::UniformBuffer::new(&display, light_block).unwrap();
     let material_ubo = glium::uniforms::UniformBuffer::new(&display, material_block).unwrap();
 
+    // ImGui 初始化
     let mut ui_ctx = global_ctx.ui_ctx;
     let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, &display).unwrap();
     let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
     let mut ui_last_frame_time = Instant::now();
-    // Font
+
+    // 字体加载
     let cn_font = ui_ctx.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../assets/fonts/font.ttf"),
-        size_pixels: 32.0,
-        config: Some(FontConfig {
-            glyph_ranges: FontGlyphRanges::chinese_full(),
-            ..Default::default()
-        }),
+        size_pixels: 20.0, 
+        config: Some(FontConfig { glyph_ranges: FontGlyphRanges::chinese_full(), ..Default::default() }),
     }]);
-    ui_renderer
-        .reload_font_texture(&mut ui_ctx)
-        .expect("字体加载失败");
+    ui_renderer.reload_font_texture(&mut ui_ctx).expect("字体加载失败");
+    ui_platform.attach_window(ui_ctx.io_mut(), &window, imgui_winit_support::HiDpiMode::Locked(1.0));
 
-    ui_platform.attach_window(
-        ui_ctx.io_mut(),
-        &window,
-        imgui_winit_support::HiDpiMode::Locked(1.0),
-    );
+    // 相机初始化
     let (width, height) = display.get_framebuffer_dimensions();
-    let aspect_ratio = width as f32 / height as f32;
-
-    // 初始化
-    let mut camera = camera::Camera::new(aspect_ratio);
-    camera.transform.position = [0.0, 0.0, 5.0].into();
-    // 初始化鼠标
+    let mut camera = camera::Camera::new(width as f32 / height as f32);
+    camera.transform.position = [0.0, 2.0, 5.0].into();
+    camera.transform.look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
     let mut mouse_state = mouse::MouseState::new();
-    // 定义顶点的数组格式
-    // #[derive(Copy, Clone)]
-    // struct Vertex {
-    //     position: [f32; 2],
-    // }
 
-    // // 自动实现一些和顶点有关的方法
-    // implement_vertex!(Vertex, position);
-
-    // // 形状是由顶点组成的数组
-    // let shape = vec![
-    //     Vertex {
-    //         position: [-0.5, -0.5],
-    //     },
-    //     Vertex {
-    //         position: [-0.5, 0.5],
-    //     },
-    //     Vertex {
-    //         position: [0.5, 0.5],
-    //     },
-    //     Vertex {
-    //         position: [0.5, -0.5],
-    //     },
-    // ];
-
-    // // 索引
-    // let indices: Vec<u16> = vec![0, 1, 2, 0, 2, 3];
-
-    // 创建顶点缓冲区
-    // let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-    // // 创建索引缓冲区
-    // let index_buffer = glium::index::IndexBuffer::new(
-    //     &display,
-    //     glium::index::PrimitiveType::TrianglesList,
-    //     &indices,
-    // )
-    // .unwrap();
-
-    // 定义初始状态 
-    let mut cy_radius = 1.0f32;      // 底面半径
-    let mut cy_top_radius = 0.5f32;  // 顶面半径
-    let mut cy_height = 2.0f32;      // 高度
-    let mut cy_sectors = 6i32;       // 切分份数
-
-    // 初始值为 None，表示还没加载任何东西
-    let mut loaded_custom_mesh: Option<cg_coop::shape::mesh::Mesh> = None;
-    
-    // 形状选择器
-    let mut shape_type = 4; // 默认选中棱台看效
-
-    // 定义 NURBS 初始状态 
-    // 创建一个 4x4 的波浪形控制点网格
-    let mut nurbs_degree = 3;
-    let mut nurbs_pts = vec![
-        // Row 0 (y=0)
-        [-1.5, 0.0, -1.5], [-0.5, 0.5, -1.5], [0.5, 0.5, -1.5], [1.5, 0.0, -1.5],
-        // Row 1 (y=0.5)
-        [-1.5, 0.5, -0.5], [-0.5, 1.5, -0.5], [0.5, 1.5, -0.5], [1.5, 0.5, -0.5],
-        // Row 2 (y=0.5)
-        [-1.5, 0.5,  0.5], [-0.5, 1.5,  0.5], [0.5, 1.5,  0.5], [1.5, 0.5,  0.5],
-        // Row 3 (y=0)
-        [-1.5, 0.0,  1.5], [-0.5, 0.5,  1.5], [0.5, 0.5,  1.5], [1.5, 0.0,  1.5],
-    ];
-    // 权重全部初始化为 1.0 
-    let mut nurbs_weights = vec![1.0f32; 16];
-
-    // 通过调用 shader库中的 create_shader 函数来创建着色器程序
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
-    let lambert_program = shader::create_shader(&display, lambert_vertex_path, lambert_fragment_path);
+
+    // === 场景初始化 ===
+    let mut scene = Scene::new();
+
+    // 默认添加地板
+    let mut floor = GameObject::new("Floor", ShapeKind::Cube{ width: 10.0, height: 0.1, depth: 10.0 }, default_mat);
+    floor.transform.position.y = -1.0;
+    scene.add_object(floor);
+
+    // 默认添加球体
+    let sphere = GameObject::new("Sphere", ShapeKind::Sphere{ radius: 0.8, sectors: 32 }, default_mat);
+    scene.add_object(sphere);
+
+    // 主循环
     #[allow(deprecated)]
-    event_loop
-        .run(move |ev, window_target| {
-            // println!("{:?}", &ev);
-            ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
-            match ev {
+    event_loop.run(move |ev, window_target| {
+        ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
+        match ev {
             Event::DeviceEvent { event, .. } => {
                 match event {
                     DeviceEvent::MouseMotion { delta } => {
-                        if mouse_state.is_locked {
+                         if mouse_state.is_locked {
                             let (dx, dy) = delta;
                             mouse_state.delta = (dx as f32, dy as f32);
-                            // 应用相机旋转
                             camera.rotate(-mouse_state.delta.0 * mouse_state.sensitivity, -mouse_state.delta.1 * mouse_state.sensitivity);
-                           window.request_redraw();
+                            window.request_redraw();
                         }
                     },
                     DeviceEvent::MouseWheel { delta } => {
-                        let scroll = match delta {
-                            glium::winit::event::MouseScrollDelta::LineDelta(_, y) => y * 50.0,  // 每行当 50 像素
+                         let scroll = match delta {
+                            glium::winit::event::MouseScrollDelta::LineDelta(_, y) => y * 50.0,
                             glium::winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
                         };
-
-                        // exp 缩放 —— 最推荐的相机缩放方式
-                        let zoom_sensitivity = 0.005; // 你可以调高调低
-
-                        camera.fovy *= f32::exp(-scroll * zoom_sensitivity);
-
-                        // 限制 FOV（单位：弧度）
+                        camera.fovy *= f32::exp(-scroll * 0.005);
                         camera.fovy = camera.fovy.clamp(0.05, 1.5);
                         window.request_redraw();
                     },
-
                     _ => {}
                 }
             }
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::KeyboardInput {
-                    event: key_event, ..
-                } => {
-                    match key_event.state {
+                WindowEvent::KeyboardInput { event: key_event, .. } => {
+                     match key_event.state {
                         ElementState::Pressed => {
                             input_state.set_key_pressed(key_event.physical_key);
-                            // 立即响应的按键（如退出）
-                            if key_event.physical_key == KeyCode::Escape {
-                                window_target.exit();
-                            }
+                            if key_event.physical_key == KeyCode::Escape { window_target.exit(); }
                         }
                         ElementState::Released => {
                             input_state.set_key_released(key_event.physical_key);
-                            // 只在释放时触发的按键
                             if key_event.physical_key == KeyCode::KeyV {
-                                if camera.move_state == camera::MoveState::Free {
-                                    camera.move_state = camera::MoveState::Locked;
-                                } else {
-                                    camera.move_state = camera::MoveState::Free;
-                                }
+                                camera.move_state = if camera.move_state == camera::MoveState::Free { camera::MoveState::Locked } else { camera::MoveState::Free };
                                 mouse_state.toggle_lock(&window);
-
                             }
                             if key_event.physical_key == KeyCode::KeyB {
                                 if camera.move_state == camera::MoveState::PanObit {
@@ -273,84 +163,41 @@ fn main() {
                     }
                 }
                 WindowEvent::RedrawRequested => {
-                    // 请求重绘
-
-                    // 每一帧都根据最新参数生成模型，根据 shape_type 动态决定画什么
-                    let mesh_data = match shape_type {
-                        0 => { // Cube
-                             let s = Cube { width: cy_radius * 2.0, height: cy_radius * 2.0, depth: cy_radius * 2.0 };
-                             s.as_mesh()
-                        },
-                        1 => { // Sphere
-                             let s = Sphere { radius: cy_radius, col_divisions: cy_sectors as u16, row_divisions: cy_sectors as u16 };
-                             s.as_mesh()
-                        },
-                        2 => { // Cylinder
-                             let s = Cylinder { 
-                                 bottom_radius: cy_radius, 
-                                 top_radius: cy_radius, 
-                                 height: cy_height, 
-                                 sectors: cy_sectors as u16 
-                             };
-                             s.as_mesh()
-                        },
-                        3 => { // Cone
-                             let s = Cone { radius: cy_radius, height: cy_height, sectors: cy_sectors as u16 };
-                             s.as_mesh()
-                        },
-                        4 => { // Frustum (多面棱台)
-                             let s = Cylinder { 
-                                 bottom_radius: cy_radius, 
-                                 top_radius: cy_top_radius, // 使用独立的顶面半径
-                                 height: cy_height, 
-                                 sectors: cy_sectors as u16 
-                             };
-                             s.as_mesh()
-                        },
-                        // 如果有加载的模型，就显示它；否则显示一个默认球体作为占位
-                        5 => {
-                             if let Some(ref mesh) = loaded_custom_mesh {
-                                 mesh.clone() // 把加载的数据拿出来渲染
-                             } else {
-                                 // 如果还没加载，就画个小球意思一下
-                                 let s = Sphere { radius: 0.5, col_divisions: 16, row_divisions: 16 };
-                                 s.as_mesh()
-                             }
-                        },
-                        6 => { // NURBS
-                             let s = NurbsSurface {
-                                 control_points: nurbs_pts.clone(), // 传入当前编辑的点
-                                 weights: nurbs_weights.clone(),
-                                 u_count: 4,
-                                 v_count: 4,
-                                 degree: nurbs_degree,
-                                 splits: 32, // 渲染精度
-                             };
-                             s.as_mesh()
-                        },
-                        _ => {
-                             let s = Sphere { radius: 1.0, col_divisions: 32, row_divisions: 32 };
-                             s.as_mesh()
-                        }
-                    };
-
                     let mut target = display.draw();
+                    target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0); 
+
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
+                    
+                    // 更新环绕相机逻辑
                     if camera.move_state == camera::MoveState::PanObit {
                         let current_time = Instant::now();
                         let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
-                        last_frame_time = current_time;
+                        // 注意：last_frame_time 在下面 AboutToWait 也会更新，这里仅用于计算
                         camera.update_pan_obit(delta_time);
                     }
+
                     ui_last_frame_time = Instant::now();
+                    
                     let ui = ui_ctx.frame();
                     let _cn_font = ui.push_font(cn_font);
-                    ui.show_demo_window(&mut true);
+
+                    // ==========================================
+                    // === 找回消失的 Demo 窗口 ===
+                    // ==========================================
+                    ui.show_demo_window(&mut true); // <--- 加上这一行！
+
+                    // ==========================================
+                    // === 1. 恢复：队友的“操作说明”窗口 ===
+                    // ==========================================
                     ui.window("操作说明")
                         .size([300.0, 100.0], Condition::FirstUseEver)
                         .build(|| {
                             ui.text_wrapped("按V键漫游\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
                         });
+
+                    // ==========================================
+                    // === 2. 恢复：队友的“灯光与材质测试”窗口 ===
+                    // ==========================================
                     ui.window("灯光与材质测试").size([400.0, 200.0], Condition::FirstUseEver).build(|| {
                         ui.slider("环境光强度", 0.0, 1.0, &mut ambient_light.intensity);
                         ui.slider("平行光强度", 0.0, 5.0, &mut directional_light.intensity);
@@ -363,158 +210,186 @@ fn main() {
                         ui.slider_config("点光源位置", -10.0, 10.0).build_array(&mut point_light.position);
                         ui.color_edit3("点光源颜色", &mut point_light.color);
                         ui.separator();
+                        ui.text("全局材质预览");
                         ui.color_edit3("材质 ka", &mut lambertian.ka);
                         ui.color_edit3("材质 kd", &mut lambertian.kd);
                     });
-                    ui.window("建模实验室").size([300.0, 350.0], Condition::FirstUseEver).build(|| {
-                        ui.text("选择形状 (Shape Select)");
-                        ui.radio_button("立方体 (Cube)", &mut shape_type, 0);
-                        ui.radio_button("球体 (Sphere)", &mut shape_type, 1);
-                        ui.radio_button("圆柱 (Cylinder)", &mut shape_type, 2);
-                        ui.radio_button("圆锥 (Cone)", &mut shape_type, 3);
-                        ui.radio_button("多面棱台/棱柱 (Frustum/Prism)", &mut shape_type, 4);
-                        ui.radio_button("导入模型 (Import Model)", &mut shape_type, 5);
-                        ui.radio_button("NURBS 曲面 (NURBS Surface)", &mut shape_type, 6);
 
-                        ui.separator();
-                        ui.text("文件操作 (File)");
+                    // ==========================================
+                    // === 3. 场景列表 (Scene List) ===
+                    // ==========================================
+                    ui.window("场景列表 (Scene List)").size([200.0, 400.0], Condition::FirstUseEver).position([20.0, 150.0], Condition::FirstUseEver).build(|| {
+                        ui.text("基础形状:");
+                        if ui.button("立方体") {
+                            scene.add_object(GameObject::new("Cube", ShapeKind::Cube{width:1.0, height:1.0, depth:1.0}, default_mat));
+                        }
+                        if ui.button("球体") {
+                            scene.add_object(GameObject::new("Sphere", ShapeKind::Sphere{radius:0.5, sectors:32}, default_mat));
+                        }
+                        
+                        ui.text("柱体/台体:");
+                        // 圆柱：顶底半径相等
+                        if ui.button("圆柱") {
+                            scene.add_object(GameObject::new("Cylinder", ShapeKind::Cylinder{top_radius:0.5, bottom_radius:0.5, height:1.0, sectors:32}, default_mat));
+                        }
+                        // 棱台：顶底半径不等
+                        if ui.button("棱台/圆台") {
+                            scene.add_object(GameObject::new("Frustum", ShapeKind::Cylinder{top_radius:0.3, bottom_radius:0.8, height:1.0, sectors:32}, default_mat));
+                        }
+                        // 圆锥
+                        if ui.button("圆锥") {
+                            scene.add_object(GameObject::new("Cone", ShapeKind::Cone{radius:0.5, height:1.0, sectors:32}, default_mat));
+                        }
 
-                        if ui.button("保存当前模型 (Save .obj)") {
-                            match mesh_data.save_obj("output.obj") {
-                                Ok(_) => println!("保存成功: output.obj"),
-                                Err(e) => println!("保存失败: {}", e),
+                        ui.text("其他:");
+                        if ui.button("导入模型") {
+                            if let Ok(mesh) = Mesh::load_obj("output.obj") {
+                                let mut obj = GameObject::new("Imported", ShapeKind::Imported, default_mat);
+                                obj.mesh = mesh;
+                                scene.add_object(obj);
                             }
                         }
                         
-                        // 加载按钮 
-                        if ui.button("加载模型 (Load .obj)") {
-                            // 使用全路径调用，避免引用错误
-                            match cg_coop::shape::mesh::Mesh::load_obj("output.obj") {
-                                Ok(loaded_mesh) => {
-                                    println!("加载成功! 包含 {} 个顶点", loaded_mesh.vertices.len());
-                                    
-                                    // 1. 把加载的数据存到我们第一步定义的变量里
-                                    loaded_custom_mesh = Some(loaded_mesh);
-                                    
-                                    // 2. 自动把视图切换到模式 5
-                                    shape_type = 5; 
-                                },
-                                Err(e) => println!("加载失败: {}", e),
-                            }
-                        }
-                        
                         ui.separator();
-                        ui.text("参数调整 (Parameters)");
+                        ui.text("场景物体:");
                         
-                        // 根据不同的形状显示不同的滑块
-                        match shape_type {
-                            1 => { // Sphere
-                                ui.slider("半径 (Radius)", 0.1, 5.0, &mut cy_radius);
-                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
-                            },
-                            2 => { // Cylinder
-                                ui.slider("半径 (Radius)", 0.1, 5.0, &mut cy_radius);
-                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
-                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
-                            },
-                            3 => { // Cone
-                                ui.slider("底面半径 (Radius)", 0.1, 5.0, &mut cy_radius);
-                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
-                                ui.slider("精度 (Sectors)", 3, 64, &mut cy_sectors);
-                            },
-                            4 => { // Frustum / Prism (多面棱台)
-                                ui.slider("底面半径 (Bottom R)", 0.1, 5.0, &mut cy_radius);
-                                ui.slider("顶面半径 (Top R)", 0.0, 5.0, &mut cy_top_radius); // 可以是0，就是棱锥
-                                ui.slider("高度 (Height)", 0.1, 5.0, &mut cy_height);
-                                ui.slider("侧面数 (Sides)", 3, 64, &mut cy_sectors); // 限制在3-64
-                            },
-                            6 => { // NURBS
-                            ui.text("控制点编辑 (Control Points)");
-                            // 简单的 UI：只让动中间 4 个点，防止 UI 太乱
-                            ui.slider("Point [1,1] Height", -2.0, 3.0, &mut nurbs_pts[5][1]); // 修改第5个点的Y
-                            ui.slider("Point [1,2] Height", -2.0, 3.0, &mut nurbs_pts[6][1]); // 修改第6个点的Y
-                            ui.slider("Point [2,1] Height", -2.0, 3.0, &mut nurbs_pts[9][1]); 
-                            ui.slider("Point [2,2] Height", -2.0, 3.0, &mut nurbs_pts[10][1]);
-
-                            ui.separator();
-                            ui.text("权重控制 (Weights - R in NURBS)");
-                            ui.slider("Point [1,1] Weight", 0.1, 5.0, &mut nurbs_weights[5]);
-                        },
-                            _ => {} // Cube 不需要参数
+                        // 遍历显示所有物体
+                        for (i, obj) in scene.objects.iter().enumerate() {
+                            let is_selected = scene.selected_index == Some(i);
+                            if ui.selectable_config(&format!("{}: {}", i, obj.name)).selected(is_selected).build() {
+                                scene.selected_index = Some(i);
+                            }
                         }
                     });
-                    target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
-                    let model = [
-                        [0.5, 0.0, 0.0, 0.0],
-                        [0.0, 0.5, 0.0, 0.0],
-                        [0.0, 0.0, 0.5, 0.0],
-                        [0.0, 0.0, 2.0, 1.0f32]
-                    ];
+
+                    // ==========================================
+                    // === 4. 属性面板 (Inspector) ===
+                    // ==========================================
+                    if let Some(obj) = scene.get_selected_mut() {
+                        ui.window("属性面板 (Inspector)").size([250.0, 400.0], Condition::FirstUseEver).position([240.0, 150.0], Condition::FirstUseEver).build(|| {
+                            ui.text_colored([0.0, 1.0, 0.0, 1.0], &format!("当前选中: {}", obj.name));
+                            ui.separator();
+
+                            ui.text("变换 (Transform)");
+                            let mut pos = obj.transform.position.to_array();
+                            if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
+                                obj.transform.position = pos.into();
+                            }
+                            
+                            let mut scale = obj.transform.scale.to_array();
+                            if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) {
+                                obj.transform.scale = scale.into();
+                            }
+
+                            // 旋转涉及到四元数，简单起见我们这里提供重置
+                            if ui.button("重置旋转") {
+                                obj.transform.rotation = glam::f32::Quat::IDENTITY;
+                            }
+
+                            ui.separator();
+                            ui.text("形状参数 (Parameters)");
+                            
+                            let mut need_regen = false;
+                            match &mut obj.kind {
+                                ShapeKind::Cube { width, height, depth } => {
+                                    if Drag::new("宽").speed(0.1).build(ui, width) { need_regen = true; }
+                                    if Drag::new("高").speed(0.1).build(ui, height) { need_regen = true; }
+                                    if Drag::new("深").speed(0.1).build(ui, depth) { need_regen = true; }
+                                },
+                                ShapeKind::Sphere { radius, sectors } => {
+                                    if Drag::new("半径").speed(0.05).build(ui, radius) { need_regen = true; }
+                                    let mut s = *sectors as i32;
+                                    if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
+                                },
+                                // 更新：Cylinder 现在处理 圆柱、棱柱、棱台
+                                ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
+                                    ui.text("几何尺寸:");
+                                    if Drag::new("顶半径").speed(0.05).build(ui, top_radius) { need_regen = true; }
+                                    if Drag::new("底半径").speed(0.05).build(ui, bottom_radius) { need_regen = true; }
+                                    if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
+                                    
+                                    ui.separator();
+                                    ui.text("边数控制 (棱柱调节这里):");
+                                    // 重点：棱柱就是边数很少的圆柱
+                                    let mut s = *sectors as i32;
+                                    if ui.slider("精度/边数", 3, 64, &mut s) { 
+                                        *sectors = s as u16; 
+                                        need_regen = true; 
+                                    }
+                                    if *sectors < 5 {
+                                        ui.text_colored([1.0, 1.0, 0.0, 1.0], "提示: 低精度即为棱柱/棱台");
+                                    }
+                                },
+                                // 更新：圆锥面板
+                                ShapeKind::Cone { radius, height, sectors } => {
+                                    if Drag::new("底半径").speed(0.05).build(ui, radius) { need_regen = true; }
+                                    if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
+                                    let mut s = *sectors as i32;
+                                    if ui.slider("精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
+                                },
+                                _ => {}
+                            }
+
+                            if need_regen {
+                                obj.regenerate_mesh();
+                            }
+                            
+                            ui.separator();
+                            ui.checkbox("显示/隐藏", &mut obj.visible);
+                            if ui.button("保存当前模型") {
+                                let _ = obj.mesh.save_obj("output.obj");
+                            }
+                        });
+                    }
+
+                    // === 渲染循环 (遍历场景) ===
+                    let mut l_block = LightBlock { lights: [Light::default(); 32], num_lights: 0 };
+                    l_block.lights[0] = ambient_light.to_Light(); l_block.num_lights += 1;
+                    l_block.lights[1] = directional_light.to_Light(); l_block.num_lights += 1;
+                    l_block.lights[2] = point_light.to_Light(); l_block.num_lights += 1;
+                    l_block.lights[3] = spot_light.to_Light(); l_block.num_lights += 1; // 加上聚光灯
+                    light_ubo.write(&l_block);
+
                     let view = camera.get_view_matrix();
-                    let viewPos = camera.get_position();
                     let perspective = camera.get_projection_matrix();
+                    let viewPos = camera.get_position();
+
                     let params = glium::DrawParameters {
                         depth: glium::Depth {
                             test: glium::draw_parameters::DepthTest::IfLess,
                             write: true,
                             .. Default::default()
                         },
-                        //backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
                         .. Default::default()
                     };
-                    let mut l_block = LightBlock {
-                        lights: [Light::default(); 32], // 初始化数组，每个元素都是 Light::default()
-                        num_lights: 0,
-                    };
 
-                    l_block.lights[l_block.num_lights as usize] = ambient_light.to_Light();
-                    l_block.num_lights += 1;
-                    l_block.lights[l_block.num_lights as usize] = directional_light.to_Light();
-                    l_block.num_lights += 1;
-                    l_block.lights[l_block.num_lights as usize] = point_light.to_Light();
-                    l_block.num_lights += 1;
-                    l_block.lights[l_block.num_lights as usize] = spot_light.to_Light();
-                    l_block.num_lights += 1;
+                    for obj in &scene.objects {
+                        if !obj.visible { continue; }
+                        let model = obj.transform.get_matrix().to_cols_array_2d();
+                        let m_block = material::MaterialBlock { material: obj.material };
+                        material_ubo.write(&m_block);
 
-                    let mut m_block = material::MaterialBlock { material: phong.to_Material() };
+                        let vertex_data: Vec<Vertex> = obj.mesh.vertices.iter().map(|v| Vertex { position: *v }).collect();
+                        let normal_data: Vec<Normal> = obj.mesh.normals.iter().map(|n| Normal { normal: *n }).collect();
+                        
+                        if vertex_data.is_empty() { continue; }
 
-                    light_ubo.write(&l_block);
-                    material_ubo.write(&m_block);
-                    let light = [-1.0, 0.4, 0.9f32];
-                    // 转换格式 (为了 Glium)
-                    let vertex_data: Vec<Vertex> = mesh_data.vertices
-                        .iter()
-                        .map(|v| Vertex { position: *v })
-                        .collect();
+                        let positions = glium::VertexBuffer::new(&display, &vertex_data).unwrap();
+                        let normals = glium::VertexBuffer::new(&display, &normal_data).unwrap();
+                        let indices = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &obj.mesh.indices).unwrap();
 
-                    let normal_data: Vec<Normal> = mesh_data.normals
-                        .iter()
-                        .map(|n| Normal { normal: *n })
-                        .collect();
-
-                    // 传给显卡
-                    let positions = glium::VertexBuffer::new(&display, &vertex_data).unwrap();
-                    let normals = glium::VertexBuffer::new(&display, &normal_data).unwrap();
-                    let indices = glium::IndexBuffer::new(
-                        &display,
-                        glium::index::PrimitiveType::TrianglesList,
-                        &mesh_data.indices,
-                    ).unwrap();
-                    
-                    target.draw((&positions, &normals), &indices, &phong_program,
-                                &uniform! { model: model, view: view, perspective: perspective,
+                        target.draw((&positions, &normals), &indices, &phong_program,
+                            &uniform! { 
+                                model: model, 
+                                view: view, 
+                                perspective: perspective,
                                 viewPos: viewPos,
                                 Material_Block: &material_ubo,
                                 Light_Block: &light_ubo,
-                                },
-                                &params).unwrap();
-                                
-                    // target.draw((&positions, &normals), &indices, &lambert_program,
-                    //             &uniform! { model: model, view: view, perspective: perspective,
-                    //             Material_Block: &material_ubo,
-                    //             Light_Block: &light_ubo,
-                    //             },
-                    //             &params).unwrap();
+                            },
+                            &params).unwrap();
+                    }
+
                     _cn_font.pop();
                     let draw_data = ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {
@@ -522,50 +397,26 @@ fn main() {
                     }
                     target.finish().unwrap();
                 }
-                winit::event::WindowEvent::CloseRequested => {
-                    window_target.exit();
-                }
+                winit::event::WindowEvent::CloseRequested => { window_target.exit(); }
                 _ => (),
             },
             Event::AboutToWait => {
                 let current_time = Instant::now();
                 let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
                 last_frame_time = current_time;
-                // 使用 delta_time 确保移动速度与帧率无关
-                let move_speed = 3.0; // 单位/秒
-                let move_distance = move_speed * delta_time;
-                let mut moved = false;
+                let move_speed = 5.0 * delta_time;
+                
                 if camera.move_state == camera::MoveState::Free {
-                    if input_state.is_keycode_pressed(KeyCode::KeyW) {
-                        camera.transform.position += camera.transform.get_forward() * move_distance;
-                        moved = true;
-                    }
-                    if input_state.is_keycode_pressed(KeyCode::KeyS) {
-                        camera.transform.position += -camera.transform.get_forward() * move_distance;
-                        moved = true;
-                    }
-                    if input_state.is_keycode_pressed(KeyCode::KeyA) {
-                        camera.transform.position += -camera.transform.get_right() * move_distance;
-                        moved = true;
-                    }
-                    if input_state.is_keycode_pressed(KeyCode::KeyD) {
-                        camera.transform.position += camera.transform.get_right() * move_distance;
-                        moved = true;
-                    }
-                    if input_state.is_keycode_pressed(KeyCode::ControlLeft) {
-                        camera.transform.position += -glam::f32::Vec3::Y * move_distance;
-                        moved = true;
-                    }
-                    if input_state.is_keycode_pressed(KeyCode::Space)  {
-                        camera.transform.position += glam::f32::Vec3::Y * move_distance;
-                        moved = true;
-                    }
+                    if input_state.is_keycode_pressed(KeyCode::KeyW) { camera.transform.position += camera.transform.get_forward() * move_speed; }
+                    if input_state.is_keycode_pressed(KeyCode::KeyS) { camera.transform.position -= camera.transform.get_forward() * move_speed; }
+                    if input_state.is_keycode_pressed(KeyCode::KeyA) { camera.transform.position -= camera.transform.get_right() * move_speed; }
+                    if input_state.is_keycode_pressed(KeyCode::KeyD) { camera.transform.position += camera.transform.get_right() * move_speed; }
+                    if input_state.is_keycode_pressed(KeyCode::Space) { camera.transform.position += glam::f32::Vec3::Y * move_speed; }
+                    if input_state.is_keycode_pressed(KeyCode::ControlLeft) { camera.transform.position -= glam::f32::Vec3::Y * move_speed; }
                 }
-                if moved || true { // 总是重绘以保持流畅
-                    window.request_redraw();
-                }
+                window.request_redraw();
             },
             _ => (),
-        }})
-        .unwrap();
+        }
+    }).unwrap();
 }
