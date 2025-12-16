@@ -19,7 +19,7 @@ macro_rules! implement_uniform_block_new {
                         }
                     }
 
-                    fn matches_from_ty<T: $crate::glium::uniforms::UniformBlock + ?Sized>(_: Option<&T>, 
+                    fn matches_from_ty<T: $crate::glium::uniforms::UniformBlock + ?Sized>(_: Option<&T>,
                         layout: &$crate::glium::program::BlockLayout,
                         base_offset: usize,
                     ) -> Result<(), $crate::glium::uniforms::LayoutMismatchError> {

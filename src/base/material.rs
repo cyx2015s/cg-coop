@@ -3,13 +3,13 @@ use crate::implement_uniform_block_new;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
-pub struct MaterialBlock { 
+pub struct MaterialBlock {
     pub material: Material,
 }
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
-pub struct Material { 
+pub struct Material {
     pub ka: [f32; 3],
     pub _pad1: f32,
     pub kd: [f32; 3],
@@ -46,7 +46,7 @@ impl Phong {
         Self { ka, kd, ks, ns }
     }
 
-    pub fn to_Material(&self) -> Material { 
+    pub fn to_Material(&self) -> Material {
         Material {
             ka: self.ka,
             _pad1: 0.0,
@@ -75,7 +75,7 @@ impl Phong {
         data[2][2] = self.ks[2];
         data[3][3] = self.ns;
         data
-     }
+    }
 }
 
 pub struct Lambertian {
@@ -88,7 +88,7 @@ impl Lambertian {
         Self { ka, kd }
     }
 
-    pub fn to_Material(&self) -> Material { 
+    pub fn to_Material(&self) -> Material {
         Material {
             ka: self.ka,
             _pad1: 0.0,

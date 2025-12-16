@@ -42,11 +42,11 @@ impl AsMesh for Sphere {
 
                 indices.push(first);
                 indices.push(second);
-                indices.push(((first + 1)));
+                indices.push((first + 1));
 
                 indices.push(second);
-                indices.push(((second + 1)));
-                indices.push(((first + 1)));
+                indices.push((second + 1));
+                indices.push((first + 1));
             }
         }
 

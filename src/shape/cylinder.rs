@@ -38,7 +38,11 @@ impl AsMesh for Cylinder {
             tex_coords.push([u, 1.0]); // 顶部 V=1
 
             // 底圈
-            vertices.push([self.bottom_radius * x_sin, -half_h, self.bottom_radius * z_cos]);
+            vertices.push([
+                self.bottom_radius * x_sin,
+                -half_h,
+                self.bottom_radius * z_cos,
+            ]);
             normals.push([nx, ny, nz]);
             tex_coords.push([u, 0.0]); // 底部 V=0
         }
@@ -48,8 +52,12 @@ impl AsMesh for Cylinder {
             let bottom1 = top1 + 1;
             let top2 = top1 + 2;
             let bottom2 = bottom1 + 2;
-            indices.push(bottom1); indices.push(top1); indices.push(top2);
-            indices.push(bottom1); indices.push(top2); indices.push(bottom2);
+            indices.push(bottom1);
+            indices.push(top1);
+            indices.push(top2);
+            indices.push(bottom1);
+            indices.push(top2);
+            indices.push(bottom2);
         }
 
         // 2. 顶盖
@@ -95,6 +103,11 @@ impl AsMesh for Cylinder {
             indices.push(bottom_center_idx + 1 + i);
         }
 
-        Mesh { vertices, normals, tex_coords, indices }
+        Mesh {
+            vertices,
+            normals,
+            tex_coords,
+            indices,
+        }
     }
 }

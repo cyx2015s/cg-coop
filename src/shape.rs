@@ -1,6 +1,6 @@
+pub mod cone;
 pub mod cube;
+pub mod cylinder;
 pub mod mesh;
-pub mod sphere;
-pub mod cylinder; 
-pub mod cone;     
 pub mod nurbs;
+pub mod sphere;

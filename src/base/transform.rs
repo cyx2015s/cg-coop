@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, PartialEq)]
 pub struct Transform {
     pub position: glam::f32::Vec3,
     pub rotation: glam::f32::Quat,

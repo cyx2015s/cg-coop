@@ -1,21 +1,23 @@
 mod scene;
 
 use cg_coop::base::keystate::InputState;
-use cg_coop::base::light::{Light, LightBlock, AmbientLight, DirectionalLight, PointLight, SpotLight};
+use cg_coop::base::light::{
+    AmbientLight, DirectionalLight, Light, LightBlock, PointLight, SpotLight,
+};
 use cg_coop::base::material;
 use cg_coop::base::mouse;
 use cg_coop::camera;
 use cg_coop::shader;
-use glium::winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
+use cg_coop::shape::mesh::{AsMesh, Mesh};
+use glium::texture::{DepthFormat, DepthTexture2d, MipmapsOption};
+use glium::winit::event::{ElementState, Event, WindowEvent};
 use glium::winit::keyboard::KeyCode;
 use glium::*;
-use imgui::{Condition, FontConfig, FontGlyphRanges, FontSource, Drag, Slider, ColorEdit3}; 
-use std::time::Instant;
-use cg_coop::shape::mesh::{AsMesh, Mesh};
+use imgui::sys::{ImGuiKey_B, ImGuiKey_P, ImGuiKey_R, ImGuiKey_V};
+use imgui::{ColorEdit3, Condition, Drag, FontConfig, FontGlyphRanges, FontSource, Slider};
+use scene::{GameObject, Scene, ShapeKind};
 use std::path::Path;
-use glium::framebuffer::SimpleFrameBuffer;
-use glium::texture::{DepthTexture2d, DepthFormat, MipmapsOption};
-use scene::{Scene, GameObject, ShapeKind};
+use std::time::Instant;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -33,61 +35,83 @@ implement_vertex!(Normal, normal);
 fn main() {
     let phong_vertex_path = "assets/shaders/Phong.vert";
     let phong_fragment_path = "assets/shaders/Phong.frag";
-    
-    let default_mat = material::Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_Material();
+
+    let default_mat =
+        material::Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0)
+            .to_Material();
 
     let mut ambient_light = AmbientLight::new(0.2);
-    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, -2.0, -1.0], 1.5, [1.0, 1.0, 1.0]);
+    let mut directional_light =
+        DirectionalLight::new([0.0, 0.0, 1.0], [0.0, -2.0, -1.0], 1.5, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
-        position: [2.0, 2.0, 2.0], intensity: 0.0, color: [1.0, 1.0, 1.0], kc: 1.0, kl: 0.09, kq: 0.032,
+        position: [2.0, 2.0, 2.0],
+        intensity: 0.0,
+        color: [1.0, 1.0, 1.0],
+        kc: 1.0,
+        kl: 0.09,
+        kq: 0.032,
     };
     let mut spot_light = SpotLight {
-        position: [0.0, 5.0, 0.0], direction: [0.0, -1.0, 0.0], intensity: 10.0, color: [1.0, 1.0, 1.0],
-        angle: 30.0, kc: 1.0, kl: 0.09, kq: 10.2,
+        position: [0.0, 5.0, 0.0],
+        direction: [0.0, -1.0, 0.0],
+        intensity: 10.0,
+        color: [1.0, 1.0, 1.0],
+        angle: 30.0,
+        kc: 1.0,
+        kl: 0.09,
+        kq: 10.2,
     };
-    
-    let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]); 
+
+    let mut lambertian = material::Lambertian::new([1.0, 0.1, 0.1], [1.0, 0.1, 0.1]);
 
     let mut input_state = InputState::new();
     let mut last_frame_time = Instant::now();
-    let global_ctx = cg_coop::ctx::GlobalContext { ui_ctx: imgui::Context::create() };
+    let global_ctx = cg_coop::ctx::GlobalContext {
+        ui_ctx: imgui::Context::create(),
+    };
 
     let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
         .with_title("Project - Mini Blender Mode")
         .build(&event_loop);
 
-    let light_block = LightBlock { lights: [Light::default(); 32], num_lights: 0 };
-    let material_block = material::MaterialBlock { material: material::Material::default() };
+    let light_block = LightBlock {
+        lights: [Light::default(); 32],
+        num_lights: 0,
+    };
+    let material_block = material::MaterialBlock {
+        material: material::Material::default(),
+    };
     let light_ubo = glium::uniforms::UniformBuffer::new(&display, light_block).unwrap();
     let material_ubo = glium::uniforms::UniformBuffer::new(&display, material_block).unwrap();
 
     let default_texture = {
-        let size = 64;       // 纹理总大小
-        let check_size = 8;  // 每个格子的大小 (8x8像素)
+        let size = 64; // 纹理总大小
+        let check_size = 8; // 每个格子的大小 (8x8像素)
         let mut data = Vec::with_capacity(size * size * 4);
-        
+
         for y in 0..size {
             for x in 0..size {
                 // 根据坐标计算当前像素应该是黑还是白
                 let is_white = ((x / check_size) + (y / check_size)) % 2 == 0;
                 let color = if is_white { 255u8 } else { 0u8 };
-                
+
                 data.push(color);
-                data.push(color); 
-                data.push(color); 
-                data.push(255);   
+                data.push(color);
+                data.push(color);
+                data.push(255);
             }
         }
-        
-        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&data, (size as u32, size as u32));
+
+        let image =
+            glium::texture::RawImage2d::from_raw_rgba_reversed(&data, (size as u32, size as u32));
         glium::texture::SrgbTexture2d::new(&display, image).unwrap()
     };
 
     let loaded_texture: Option<glium::texture::SrgbTexture2d> = {
         let path_jpg = "assets/texture.jpg";
         let path_png = "assets/texture.png";
-        
+
         let load_path = if Path::new(path_jpg).exists() {
             Some(path_jpg)
         } else if Path::new(path_png).exists() {
@@ -100,12 +124,13 @@ fn main() {
             println!("正在加载纹理: {}", p);
             match image::open(p) {
                 Ok(img) => {
-                    let img = img.flipv(); 
-                    let img = img.to_rgba8(); 
+                    let img = img.flipv();
+                    let img = img.to_rgba8();
                     let dims = img.dimensions();
-                    let raw = glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), dims);
+                    let raw =
+                        glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), dims);
                     Some(glium::texture::SrgbTexture2d::new(&display, raw).unwrap())
-                },
+                }
                 Err(e) => {
                     println!("纹理加载失败: {}", e);
                     None
@@ -123,119 +148,148 @@ fn main() {
 
     let cn_font = ui_ctx.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../assets/fonts/font.ttf"),
-        size_pixels: 20.0, 
-        config: Some(FontConfig { glyph_ranges: FontGlyphRanges::chinese_full(), ..Default::default() }),
+        size_pixels: 16.0 * window.scale_factor() as f32,
+        config: Some(FontConfig {
+            glyph_ranges: FontGlyphRanges::chinese_full(),
+            ..Default::default()
+        }),
     }]);
-    ui_renderer.reload_font_texture(&mut ui_ctx).expect("字体加载失败");
-    ui_platform.attach_window(ui_ctx.io_mut(), &window, imgui_winit_support::HiDpiMode::Locked(1.0));
+    ui_renderer
+        .reload_font_texture(&mut ui_ctx)
+        .expect("字体加载失败");
+    ui_platform.attach_window(
+        ui_ctx.io_mut(),
+        &window,
+        imgui_winit_support::HiDpiMode::Locked(1.0),
+    );
 
     let (width, height) = display.get_framebuffer_dimensions();
     let mut camera = camera::Camera::new(width as f32 / height as f32);
     camera.transform.position = [0.0, 4.0, 10.0].into();
-    camera.transform.look_at([0.0, 0.0, 0.0].into(), [0.0, -1.0, 0.0].into());
+    camera
+        .transform
+        .look_at([0.0, 0.0, 0.0].into(), [0.0, -1.0, 0.0].into());
     let mut mouse_state = mouse::MouseState::new();
 
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
 
     let mut scene = Scene::new();
 
-    let debug_sphere_mesh = cg_coop::shape::sphere::Sphere { 
-        radius: 0.05, col_divisions: 8, row_divisions: 8 
-    }.as_mesh();
+    let debug_sphere_mesh = cg_coop::shape::sphere::Sphere {
+        radius: 0.05,
+        col_divisions: 8,
+        row_divisions: 8,
+    }
+    .as_mesh();
 
-    let debug_sphere_verts: Vec<Vertex> = debug_sphere_mesh.vertices.iter()
+    let debug_sphere_verts: Vec<Vertex> = debug_sphere_mesh
+        .vertices
+        .iter()
         .zip(debug_sphere_mesh.tex_coords.iter())
-        .map(|(v, t)| Vertex { position: *v, texCoord: *t })
+        .map(|(v, t)| Vertex {
+            position: *v,
+            texCoord: *t,
+        })
         .collect();
-    let debug_sphere_norms: Vec<Normal> = debug_sphere_mesh.normals.iter().map(|n| Normal { normal: *n }).collect();
+    let debug_sphere_norms: Vec<Normal> = debug_sphere_mesh
+        .normals
+        .iter()
+        .map(|n| Normal { normal: *n })
+        .collect();
     let debug_sphere_vbo = glium::VertexBuffer::new(&display, &debug_sphere_verts).unwrap();
     let debug_sphere_nbo = glium::VertexBuffer::new(&display, &debug_sphere_norms).unwrap();
-    let debug_sphere_ibo = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &debug_sphere_mesh.indices).unwrap();
+    let debug_sphere_ibo = glium::IndexBuffer::new(
+        &display,
+        glium::index::PrimitiveType::TrianglesList,
+        &debug_sphere_mesh.indices,
+    )
+    .unwrap();
 
     let mut current_nurbs_idx: i32 = 0;
 
-    let mut floor = GameObject::new("Floor", ShapeKind::Cube{ width: 10.0, height: 0.1, depth: 10.0 }, default_mat);
+    let mut floor = GameObject::new(
+        "Floor",
+        ShapeKind::Cube {
+            width: 10.0,
+            height: 0.1,
+            depth: 10.0,
+        },
+        default_mat,
+    );
     floor.transform.position.y = -1.0;
     scene.add_object(floor);
 
-    let sphere = GameObject::new("Sphere", ShapeKind::Sphere{ radius: 0.8, sectors: 32 }, default_mat);
+    let sphere = GameObject::new(
+        "Sphere",
+        ShapeKind::Sphere {
+            radius: 0.8,
+            sectors: 32,
+        },
+        default_mat,
+    );
     scene.add_object(sphere);
 
-    let shadow_program = shader::create_shader(&display, "assets/shaders/Shadow.vert", "assets/shaders/Shadow.frag");
-    
-    // 1. 创建阴影贴图 
-    let shadow_map_size = 2048; 
+    let shadow_program = shader::create_shader(
+        &display,
+        "assets/shaders/Shadow.vert",
+        "assets/shaders/Shadow.frag",
+    );
+
+    // 1. 创建阴影贴图
+    let shadow_map_size = 2048;
     let shadow_texture = DepthTexture2d::empty_with_format(
         &display,
         DepthFormat::I24,
         MipmapsOption::NoMipmap,
         shadow_map_size,
         shadow_map_size,
-    ).unwrap();
+    )
+    .unwrap();
 
     #[allow(deprecated)]
     event_loop.run(move |ev, window_target| {
         ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
         match ev {
-            Event::DeviceEvent { event, .. } => {
-                match event {
-                    DeviceEvent::MouseMotion { delta } => {
-                         if mouse_state.is_locked {
-                            let (dx, dy) = delta;
-                            mouse_state.delta = (dx as f32, dy as f32);
-                            camera.rotate(-mouse_state.delta.0 * mouse_state.sensitivity, -mouse_state.delta.1 * mouse_state.sensitivity);
-                            window.request_redraw();
-                        }
-                    },
-                    DeviceEvent::MouseWheel { delta } => {
-                         let scroll = match delta {
-                            glium::winit::event::MouseScrollDelta::LineDelta(_, y) => y * 50.0,
-                            glium::winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
-                        };
-                        camera.fovy *= f32::exp(-scroll * 0.005);
-                        camera.fovy = camera.fovy.clamp(0.05, 1.5);
-                        window.request_redraw();
-                    },
-                    _ => {}
-                }
-            }
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::KeyboardInput { event: key_event, .. } => {
-                     match key_event.state {
-                        ElementState::Pressed => {
-                            input_state.set_key_pressed(key_event.physical_key);
-                            if key_event.physical_key == KeyCode::Escape { window_target.exit(); }
-                        }
-                        ElementState::Released => {
-                            input_state.set_key_released(key_event.physical_key);
-                            if key_event.physical_key == KeyCode::KeyV {
-                                camera.move_state = if camera.move_state == camera::MoveState::Free { camera::MoveState::Locked } else { camera::MoveState::Free };
-                                mouse_state.toggle_lock(&window);
-                            }
-                            if key_event.physical_key == KeyCode::KeyB {
-                                if camera.move_state == camera::MoveState::PanObit {
-                                    camera.stop_pan_obit();
-                                } else {
-                                    camera.start_pan_obit(0.0, 5.0, [0.5, 0.5, 0.5]);
-                                    camera.pan_obit_speed = 10.0;
-                                }
-                            }
-                            if key_event.physical_key == KeyCode::KeyR {
-                                camera.fovy = 3.141592 / 2.0;
-                            }
-                            if key_event.physical_key == KeyCode::KeyP {
-                                let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
-                                let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
-                                let image = image::DynamicImage::ImageRgba8(image).flipv();
-                                image.save("screenshot.png").unwrap();
-                            }
-                        }
-                    }
-                }
                 WindowEvent::RedrawRequested => {
                     let mut target = display.draw(); 
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
                     
+                    if mouse_state.is_locked {
+                        let [dx, dy] = ui_ctx.io().mouse_delta;
+                        camera.rotate(-dx * mouse_state.sensitivity, -dy * mouse_state.sensitivity);
+                    }
+
+                    {
+                        let scroll = ui_ctx.io_mut().mouse_wheel;
+                        camera.fovy *= f32::exp(-scroll * 0.005);
+                        camera.fovy = camera.fovy.clamp(0.05, 1.5);
+                    }
+
+                    {
+                        if ui_ctx.io().keys_down[ImGuiKey_V as usize] {
+                            camera.move_state = if camera.move_state == camera::MoveState::Free { camera::MoveState::Locked } else { camera::MoveState::Free };
+                            mouse_state.toggle_lock(&window);                        
+                        }
+                        if ui_ctx.io().keys_down[ImGuiKey_B as usize] {
+                            if camera.move_state == camera::MoveState::PanObit {
+                                camera.stop_pan_obit();
+                            } else {
+                                camera.start_pan_obit(0.0, 5.0, [0.5, 0.5, 0.5]);
+                                camera.pan_obit_speed = 10.0;
+                            }
+                        }
+                        if ui_ctx.io().keys_down[ImGuiKey_R as usize] {
+                            camera.fovy = 3.141592 / 2.0;
+                        }
+                        if ui_ctx.io().keys_down[ImGuiKey_P as usize] {
+                            let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
+                            let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
+                            let image = image::DynamicImage::ImageRgba8(image).flipv();
+                            image.save("screenshot.png").unwrap();
+                        }
+                    }
+
                     if camera.move_state == camera::MoveState::PanObit {
                         let current_time = Instant::now();
                         let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
@@ -375,6 +429,21 @@ fn main() {
                             
                             if need_regen {
                                 obj.regenerate_mesh();
+                            }
+
+                            if obj.kind != ShapeKind::Imported {
+                                if (ui.button("网格化（不可逆！）")) {
+                                    *obj = GameObject {
+                                        name: obj.name.clone() + " (Meshed)",
+                                        transform: obj.transform.clone(),
+                                        material: obj.material,
+                                        mesh: obj.mesh.clone(),
+                                        kind: ShapeKind::Imported,
+                                        visible: obj.visible,
+                                        use_texture: obj.use_texture,
+                                    }
+                                    
+                                }
                             }
                             
                             ui.separator();

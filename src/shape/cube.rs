@@ -17,41 +17,89 @@ impl AsMesh for Cube {
         let mut tex_coords = Vec::new();
         let mut indices = Vec::new();
 
-        // Front Face (Z+) 
-        vertices.push([-w, -h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([0.0, 0.0]); 
-        vertices.push([ w, -h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([1.0, 0.0]); 
-        vertices.push([ w,  h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([1.0, 1.0]); 
-        vertices.push([-w,  h,  d]); normals.push([0.0, 0.0, 1.0]); tex_coords.push([0.0, 1.0]); 
-        
-        // Back Face (Z-)
-        vertices.push([ w, -h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([0.0, 0.0]);
-        vertices.push([-w, -h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([1.0, 0.0]);
-        vertices.push([-w,  h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([1.0, 1.0]);
-        vertices.push([ w,  h, -d]); normals.push([0.0, 0.0, -1.0]); tex_coords.push([0.0, 1.0]);
+        // Front Face (Z+)
+        vertices.push([-w, -h, d]);
+        normals.push([0.0, 0.0, 1.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([w, -h, d]);
+        normals.push([0.0, 0.0, 1.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([w, h, d]);
+        normals.push([0.0, 0.0, 1.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([-w, h, d]);
+        normals.push([0.0, 0.0, 1.0]);
+        tex_coords.push([0.0, 1.0]);
 
-        // Top Face (Y+) 
-        vertices.push([-w,  h,  d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([0.0, 0.0]);
-        vertices.push([ w,  h,  d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([1.0, 0.0]);
-        vertices.push([ w,  h, -d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([1.0, 1.0]);
-        vertices.push([-w,  h, -d]); normals.push([0.0, 1.0, 0.0]); tex_coords.push([0.0, 1.0]);
+        // Back Face (Z-)
+        vertices.push([w, -h, -d]);
+        normals.push([0.0, 0.0, -1.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([-w, -h, -d]);
+        normals.push([0.0, 0.0, -1.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([-w, h, -d]);
+        normals.push([0.0, 0.0, -1.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([w, h, -d]);
+        normals.push([0.0, 0.0, -1.0]);
+        tex_coords.push([0.0, 1.0]);
+
+        // Top Face (Y+)
+        vertices.push([-w, h, d]);
+        normals.push([0.0, 1.0, 0.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([w, h, d]);
+        normals.push([0.0, 1.0, 0.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([w, h, -d]);
+        normals.push([0.0, 1.0, 0.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([-w, h, -d]);
+        normals.push([0.0, 1.0, 0.0]);
+        tex_coords.push([0.0, 1.0]);
 
         // Bottom Face (Y-)
-        vertices.push([-w, -h, -d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([0.0, 0.0]);
-        vertices.push([ w, -h, -d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([1.0, 0.0]);
-        vertices.push([ w, -h,  d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([1.0, 1.0]);
-        vertices.push([-w, -h,  d]); normals.push([0.0, -1.0, 0.0]); tex_coords.push([0.0, 1.0]);
+        vertices.push([-w, -h, -d]);
+        normals.push([0.0, -1.0, 0.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([w, -h, -d]);
+        normals.push([0.0, -1.0, 0.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([w, -h, d]);
+        normals.push([0.0, -1.0, 0.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([-w, -h, d]);
+        normals.push([0.0, -1.0, 0.0]);
+        tex_coords.push([0.0, 1.0]);
 
-        // Right Face (X+) 
-        vertices.push([ w, -h,  d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([0.0, 0.0]);
-        vertices.push([ w, -h, -d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([1.0, 0.0]);
-        vertices.push([ w,  h, -d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([1.0, 1.0]);
-        vertices.push([ w,  h,  d]); normals.push([1.0, 0.0, 0.0]); tex_coords.push([0.0, 1.0]);
+        // Right Face (X+)
+        vertices.push([w, -h, d]);
+        normals.push([1.0, 0.0, 0.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([w, -h, -d]);
+        normals.push([1.0, 0.0, 0.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([w, h, -d]);
+        normals.push([1.0, 0.0, 0.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([w, h, d]);
+        normals.push([1.0, 0.0, 0.0]);
+        tex_coords.push([0.0, 1.0]);
 
         // Left Face (X-)
-        vertices.push([-w, -h, -d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([0.0, 0.0]);
-        vertices.push([-w, -h,  d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([1.0, 0.0]);
-        vertices.push([-w,  h,  d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([1.0, 1.0]);
-        vertices.push([-w,  h, -d]); normals.push([-1.0, 0.0, 0.0]); tex_coords.push([0.0, 1.0]);
+        vertices.push([-w, -h, -d]);
+        normals.push([-1.0, 0.0, 0.0]);
+        tex_coords.push([0.0, 0.0]);
+        vertices.push([-w, -h, d]);
+        normals.push([-1.0, 0.0, 0.0]);
+        tex_coords.push([1.0, 0.0]);
+        vertices.push([-w, h, d]);
+        normals.push([-1.0, 0.0, 0.0]);
+        tex_coords.push([1.0, 1.0]);
+        vertices.push([-w, h, -d]);
+        normals.push([-1.0, 0.0, 0.0]);
+        tex_coords.push([0.0, 1.0]);
 
         // Indices 生成
         for face in 0..6 {

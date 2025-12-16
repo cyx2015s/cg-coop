@@ -68,7 +68,6 @@ impl Camera {
 
     // 获取视图矩阵
     pub fn get_view_matrix(&self) -> [[f32; 4]; 4] {
-        
         glam::f32::Mat4::look_to_rh(
             self.transform.position,      // 相机位置
             self.transform.get_forward(), // 目标点（相机位置 + 前向方向）

@@ -47,8 +47,9 @@ impl Default for Light {
     }
 }
 
-
-implement_uniform_block_new!(Light, color, intensity, position, angle, direction, range, kfactor, light_type);
+implement_uniform_block_new!(
+    Light, color, intensity, position, angle, direction, range, kfactor, light_type
+);
 implement_uniform_block_new!(LightBlock, lights, num_lights);
 
 // using mat4 to pass the light
@@ -98,7 +99,7 @@ impl AmbientLight {
         }
     }
 
-    pub fn to_Light(&self) -> Light { 
+    pub fn to_Light(&self) -> Light {
         Light {
             color: self.color,
             intensity: self.intensity,
@@ -144,7 +145,7 @@ impl DirectionalLight {
         self.direction
     }
 
-    pub fn to_Light(&self) -> Light { 
+    pub fn to_Light(&self) -> Light {
         Light {
             color: self.color,
             intensity: self.intensity,
@@ -204,7 +205,7 @@ impl PointLight {
         }
     }
 
-    pub fn to_Light(&self) -> Light { 
+    pub fn to_Light(&self) -> Light {
         Light {
             color: self.color,
             intensity: self.intensity,
@@ -269,7 +270,7 @@ impl SpotLight {
         }
     }
 
-    pub fn to_Light(&self) -> Light { 
+    pub fn to_Light(&self) -> Light {
         Light {
             color: self.color,
             intensity: self.intensity,
@@ -309,7 +310,6 @@ impl SpotLight {
 //     pub lightCount: i32,
 //     pub _pad: [i32; 3],
 // }
-
 
 // implement_uniform_block!(LightBlock, lights, lightCount, _pad);
 

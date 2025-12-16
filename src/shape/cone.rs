@@ -11,7 +11,7 @@ impl AsMesh for Cone {
     fn as_mesh(&self) -> Mesh {
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
-        let mut tex_coords = Vec::new(); 
+        let mut tex_coords = Vec::new();
         let mut indices = Vec::new();
 
         let sector_step = 2.0 * PI / self.sectors as f32;
@@ -34,11 +34,11 @@ impl AsMesh for Cone {
             let nx = x_sin * nxz;
             let nz = z_cos * nxz;
 
-            // 顶点 
+            // 顶点
             // 多个重合的顶点以支持纹理接缝
             vertices.push([0.0, half_h, 0.0]);
-            normals.push([nx, ny, nz]); 
-            tex_coords.push([u, 1.0]); 
+            normals.push([nx, ny, nz]);
+            tex_coords.push([u, 1.0]);
 
             // 底圈点
             vertices.push([self.radius * x_sin, -half_h, self.radius * z_cos]);
@@ -55,7 +55,7 @@ impl AsMesh for Cone {
 
             // 圆锥侧面只需要一个三角形 (Top -> Bottom -> Next_Bottom)
             indices.push(bottom);
-            indices.push(top);     
+            indices.push(top);
             indices.push(next_bottom);
         }
 
@@ -64,7 +64,7 @@ impl AsMesh for Cone {
         // 中心点
         vertices.push([0.0, -half_h, 0.0]);
         normals.push([0.0, -1.0, 0.0]);
-        tex_coords.push([0.5, 0.5]); 
+        tex_coords.push([0.5, 0.5]);
         let center_idx = offset;
 
         for i in 0..=self.sectors {
@@ -84,6 +84,11 @@ impl AsMesh for Cone {
             indices.push(center_idx + 1 + i);
         }
 
-        Mesh { vertices, normals, tex_coords, indices }
+        Mesh {
+            vertices,
+            normals,
+            tex_coords,
+            indices,
+        }
     }
 }
