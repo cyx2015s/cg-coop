@@ -13,7 +13,8 @@ use imgui::{Condition, FontConfig, FontGlyphRanges, FontSource, Drag, Slider, Co
 use std::time::Instant;
 use cg_coop::shape::mesh::{AsMesh, Mesh};
 use std::path::Path;
-
+use glium::framebuffer::SimpleFrameBuffer;
+use glium::texture::{DepthTexture2d, DepthFormat, MipmapsOption};
 use scene::{Scene, GameObject, ShapeKind};
 
 #[derive(Copy, Clone)]
@@ -36,7 +37,7 @@ fn main() {
     let default_mat = material::Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_Material();
 
     let mut ambient_light = AmbientLight::new(0.2);
-    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, 1.0, -1.0], 5.0, [1.0, 1.0, 1.0]);
+    let mut directional_light = DirectionalLight::new([0.0, 0.0, 1.0], [0.0, -2.0, -1.0], 1.5, [1.0, 1.0, 1.0]);
     let mut point_light = PointLight {
         position: [2.0, 2.0, 2.0], intensity: 0.0, color: [1.0, 1.0, 1.0], kc: 1.0, kl: 0.09, kq: 0.032,
     };
@@ -160,6 +161,18 @@ fn main() {
     let sphere = GameObject::new("Sphere", ShapeKind::Sphere{ radius: 0.8, sectors: 32 }, default_mat);
     scene.add_object(sphere);
 
+    let shadow_program = shader::create_shader(&display, "assets/shaders/Shadow.vert", "assets/shaders/Shadow.frag");
+    
+    // 1. 创建阴影贴图 
+    let shadow_map_size = 2048; 
+    let shadow_texture = DepthTexture2d::empty_with_format(
+        &display,
+        DepthFormat::I24,
+        MipmapsOption::NoMipmap,
+        shadow_map_size,
+        shadow_map_size,
+    ).unwrap();
+
     #[allow(deprecated)]
     event_loop.run(move |ev, window_target| {
         ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
@@ -220,9 +233,7 @@ fn main() {
                     }
                 }
                 WindowEvent::RedrawRequested => {
-                    let mut target = display.draw();
-                    target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0); 
-
+                    let mut target = display.draw(); 
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
                     
                     if camera.move_state == camera::MoveState::PanObit {
@@ -332,7 +343,6 @@ fn main() {
                                 ShapeKind::Sphere { radius, sectors } => {
                                     if Drag::new("半径").speed(0.05).build(ui, radius) { need_regen = true; }
                                     let mut s = *sectors as i32;
-                                    // === 修正：Slider 调用 ===
                                     if Slider::new(ui, "精度", 3, 64).build(&mut s) { *sectors = s as u16; need_regen = true; }
                                 },
                                 ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
@@ -350,7 +360,6 @@ fn main() {
                                 },
                                 ShapeKind::Nurbs { control_points, weights, .. } => {
                                     ui.text("NURBS 控制点编辑");
-                                    // === 修正：Slider 调用 ===
                                     Slider::new(ui, "点索引", 0, 15).build(&mut current_nurbs_idx);
                                     let idx = current_nurbs_idx as usize;
                                     if idx < control_points.len() {
@@ -375,12 +384,67 @@ fn main() {
                         });
                     }
 
+                    // 更新灯光 UBO
                     let mut l_block = LightBlock { lights: [Light::default(); 32], num_lights: 0 };
                     l_block.lights[0] = ambient_light.to_Light(); l_block.num_lights += 1;
                     l_block.lights[1] = directional_light.to_Light(); l_block.num_lights += 1;
                     l_block.lights[2] = point_light.to_Light(); l_block.num_lights += 1;
                     l_block.lights[3] = spot_light.to_Light(); l_block.num_lights += 1; 
                     light_ubo.write(&l_block);
+
+                    // 生成 Shadow Map
+                    
+                    // 计算灯光空间矩阵
+                    let light_dir = glam::Vec3::from(directional_light.direction).normalize();
+                    let light_pos = glam::Vec3::ZERO - light_dir * 20.0; 
+                    
+                    let light_projection = glam::Mat4::orthographic_rh(-20.0, 20.0, -20.0, 20.0, 1.0, 50.0);
+                    let light_view = glam::Mat4::look_at_rh(light_pos, glam::Vec3::ZERO, glam::Vec3::Y);
+                    let light_space_matrix = light_projection * light_view;
+                    let light_space_arr = light_space_matrix.to_cols_array_2d();
+
+                    // 在作用域内绘制到 shadow texture
+                    {
+                        let mut shadow_target = glium::framebuffer::SimpleFrameBuffer::depth_only(&display, &shadow_texture).unwrap();
+                        shadow_target.clear_depth(1.0);
+
+                        let shadow_params = glium::DrawParameters {
+                            depth: glium::Depth {
+                                test: glium::draw_parameters::DepthTest::IfLess,
+                                write: true,
+                                .. Default::default()
+                            },
+                            .. Default::default()
+                        };
+
+                        for obj in &scene.objects {
+                            if !obj.visible { continue; }
+                            let model = obj.transform.get_matrix().to_cols_array_2d();
+                            
+                            let vertex_data: Vec<Vertex> = obj.mesh.vertices.iter()
+                                .zip(obj.mesh.tex_coords.iter())
+                                .map(|(v, t)| Vertex { position: *v, texCoord: *t })
+                                .collect();
+                            
+                            if vertex_data.is_empty() { continue; }
+                            let positions = glium::VertexBuffer::new(&display, &vertex_data).unwrap();
+                            let indices = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &obj.mesh.indices).unwrap();
+
+                            shadow_target.draw(
+                                &positions, 
+                                &indices, 
+                                &shadow_program,
+                                &uniform! {
+                                    model: model,
+                                    light_space_matrix: light_space_arr,
+                                },
+                                &shadow_params
+                            ).unwrap();
+                        }
+                    }
+
+                    // 正常绘制场景
+                    target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0); 
 
                     let view = camera.get_view_matrix();
                     let perspective = camera.get_projection_matrix();
@@ -394,6 +458,12 @@ fn main() {
                         },
                         .. Default::default()
                     };
+                    
+                    // 设置阴影贴图采样器
+                    let shadow_sampler = glium::uniforms::Sampler::new(&shadow_texture)
+                        .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+                        .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest)
+                        .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
 
                     for obj in &scene.objects {
                         if !obj.visible { continue; }
@@ -428,10 +498,14 @@ fn main() {
                                 Material_Block: &material_ubo,
                                 Light_Block: &light_ubo,
                                 diffuse_tex: use_tex, 
-                                has_texture: obj.use_texture
+                                has_texture: obj.use_texture,
+                                // 传入阴影参数
+                                light_space_matrix: light_space_arr,
+                                shadow_map: shadow_sampler,
                             },
                             &params).unwrap();
 
+                        // 绘制 NURBS Debug 小球
                         if let ShapeKind::Nurbs { control_points, .. } = &obj.kind {
                             if scene.selected_index == Some(scene.objects.iter().position(|x| std::ptr::eq(x, obj)).unwrap_or(999)) {
                                 for (idx, pt) in control_points.iter().enumerate() {
@@ -455,7 +529,10 @@ fn main() {
                                             Material_Block: &material_ubo,
                                             Light_Block: &light_ubo,
                                             diffuse_tex: use_tex, 
-                                            has_texture: false 
+                                            has_texture: false,
+                                            // 即使不需要阴影，也要传参以匹配 Shader 接口
+                                            light_space_matrix: light_space_arr,
+                                            shadow_map: shadow_sampler,
                                         },
                                         &params).unwrap();
                                 }
