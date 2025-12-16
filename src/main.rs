@@ -10,10 +10,8 @@ use cg_coop::camera;
 use cg_coop::shader;
 use cg_coop::shape::mesh::{AsMesh, Mesh};
 use glium::texture::{DepthFormat, DepthTexture2d, MipmapsOption};
-use glium::winit::event::{ElementState, Event, WindowEvent};
-use glium::winit::keyboard::KeyCode;
+use glium::winit::event::{DeviceEvent, Event, WindowEvent};
 use glium::*;
-use imgui::sys::{ImGuiKey_B, ImGuiKey_P, ImGuiKey_R, ImGuiKey_V};
 use imgui::{ColorEdit3, Condition, Drag, FontConfig, FontGlyphRanges, FontSource, Slider};
 use scene::{GameObject, Scene, ShapeKind};
 use std::path::Path;
@@ -168,7 +166,8 @@ fn main() {
     camera.transform.position = [0.0, 4.0, 10.0].into();
     camera
         .transform
-        .look_at([0.0, 0.0, 0.0].into(), [0.0, -1.0, 0.0].into());
+        .look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
+    camera.rotate(0.0, 0.0);
     let mut mouse_state = mouse::MouseState::new();
 
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
@@ -250,28 +249,57 @@ fn main() {
     event_loop.run(move |ev, window_target| {
         ui_platform.handle_event(ui_ctx.io_mut(), &window, &ev);
         match ev {
+            Event::DeviceEvent { device_id, event } => {
+                match event {
+                    DeviceEvent::MouseMotion { delta } => {
+                         if mouse_state.is_locked {
+                            let (dx, dy) = delta;
+                            mouse_state.delta = (dx as f32, dy as f32);
+                            camera.rotate(-mouse_state.delta.0 * mouse_state.sensitivity, -mouse_state.delta.1 * mouse_state.sensitivity);
+                            window.request_redraw();
+                        }
+                    },
+                    _ => {}
+                }
+            }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::RedrawRequested => {
                     let mut target = display.draw(); 
+
                     ui_ctx.io_mut().update_delta_time(Instant::now() - ui_last_frame_time);
+                    ui_last_frame_time = Instant::now();
                     
-                    if mouse_state.is_locked {
-                        let [dx, dy] = ui_ctx.io().mouse_delta;
-                        camera.rotate(-dx * mouse_state.sensitivity, -dy * mouse_state.sensitivity);
-                    }
+                    let ui = ui_ctx.frame();
+                    let _cn_font = ui.push_font(cn_font);
 
                     {
-                        let scroll = ui_ctx.io_mut().mouse_wheel;
+                        let scroll = ui.io().mouse_wheel;
                         camera.fovy *= f32::exp(-scroll * 0.005);
                         camera.fovy = camera.fovy.clamp(0.05, 1.5);
                     }
 
                     {
-                        if ui_ctx.io().keys_down[ImGuiKey_V as usize] {
+                        let current_time = Instant::now();
+                        let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
+                        last_frame_time = current_time;
+                        let move_speed = 5.0 * delta_time;
+                        
+                        if camera.move_state == camera::MoveState::Free {
+                            if ui.is_key_down(imgui::Key::W) { camera.transform.position += camera.transform.get_forward() * move_speed; }
+                            if ui.is_key_down(imgui::Key::S) { camera.transform.position -= camera.transform.get_forward() * move_speed; }
+                            if ui.is_key_down(imgui::Key::A) { camera.transform.position -= camera.transform.get_right() * move_speed; }
+                            if ui.is_key_down(imgui::Key::D) { camera.transform.position += camera.transform.get_right() * move_speed; }
+                            if ui.is_key_down(imgui::Key::Space) { camera.transform.position += glam::f32::Vec3::Y * move_speed; }
+                            if ui.is_key_down(imgui::Key::LeftCtrl) { camera.transform.position -= glam::f32::Vec3::Y * move_speed; }
+                        }
+                    }
+
+                    {
+                        if ui.is_key_pressed(imgui::Key::V) {
                             camera.move_state = if camera.move_state == camera::MoveState::Free { camera::MoveState::Locked } else { camera::MoveState::Free };
                             mouse_state.toggle_lock(&window);                        
                         }
-                        if ui_ctx.io().keys_down[ImGuiKey_B as usize] {
+                        if ui.is_key_pressed(imgui::Key::B) {
                             if camera.move_state == camera::MoveState::PanObit {
                                 camera.stop_pan_obit();
                             } else {
@@ -279,10 +307,10 @@ fn main() {
                                 camera.pan_obit_speed = 10.0;
                             }
                         }
-                        if ui_ctx.io().keys_down[ImGuiKey_R as usize] {
+                        if ui.is_key_pressed(imgui::Key::R) {
                             camera.fovy = 3.141592 / 2.0;
                         }
-                        if ui_ctx.io().keys_down[ImGuiKey_P as usize] {
+                        if ui.is_key_pressed(imgui::Key::P) {
                             let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
                             let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
                             let image = image::DynamicImage::ImageRgba8(image).flipv();
@@ -296,10 +324,6 @@ fn main() {
                         camera.update_pan_obit(delta_time);
                     }
 
-                    ui_last_frame_time = Instant::now();
-                    
-                    let ui = ui_ctx.frame();
-                    let _cn_font = ui.push_font(cn_font);
 
                     ui.show_demo_window(&mut true); 
 
@@ -620,19 +644,6 @@ fn main() {
                 _ => (),
             },
             Event::AboutToWait => {
-                let current_time = Instant::now();
-                let delta_time = current_time.duration_since(last_frame_time).as_secs_f32();
-                last_frame_time = current_time;
-                let move_speed = 5.0 * delta_time;
-                
-                if camera.move_state == camera::MoveState::Free {
-                    if input_state.is_keycode_pressed(KeyCode::KeyW) { camera.transform.position += camera.transform.get_forward() * move_speed; }
-                    if input_state.is_keycode_pressed(KeyCode::KeyS) { camera.transform.position -= camera.transform.get_forward() * move_speed; }
-                    if input_state.is_keycode_pressed(KeyCode::KeyA) { camera.transform.position -= camera.transform.get_right() * move_speed; }
-                    if input_state.is_keycode_pressed(KeyCode::KeyD) { camera.transform.position += camera.transform.get_right() * move_speed; }
-                    if input_state.is_keycode_pressed(KeyCode::Space) { camera.transform.position += glam::f32::Vec3::Y * move_speed; }
-                    if input_state.is_keycode_pressed(KeyCode::ControlLeft) { camera.transform.position -= glam::f32::Vec3::Y * move_speed; }
-                }
                 window.request_redraw();
             },
             _ => (),
