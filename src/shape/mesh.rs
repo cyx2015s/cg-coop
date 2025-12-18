@@ -181,3 +181,123 @@ fn compute_smooth_normals(vertices: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3
 
     normals
 }
+
+fn compute_closest_point(
+    vertices: &[[f32; 3]],
+    origin: [f32; 3],
+    direction: [f32; 3],
+) -> Option<([f32; 3], f32)> {
+    let mut closest_point: Option<[f32; 3]> = None;
+    let mut max_cos = 0.0;
+    let direction = glam::vec3(direction[0], direction[1], direction[2]);
+    let direction = direction.normalize();
+    for v in vertices {
+        let to_vertex = glam::vec3(v[0] - origin[0], v[1] - origin[1], v[2] - origin[2]);
+        let t = to_vertex.dot(direction);
+
+        if t >= 0.0 {
+            let cos_angle = t / to_vertex.length();
+            if cos_angle > max_cos {
+                max_cos = cos_angle;
+                closest_point = Some(*v);
+            }
+        }
+    }
+
+    closest_point.map(|p| (p, max_cos))
+}
+
+#[test]
+fn test_compute_closest_point() {
+    let vertices = vec![[1.0, 0.0, 0.0], [1.0, 0.9, 0.0], [0.0, 0.0, 1.0]];
+    let origin = [0.0, 0.0, 0.0];
+    let direction = [1.0, 1.0, 0.0];
+
+    let closest = compute_closest_point(&vertices, origin, direction);
+    assert!(closest.is_some_and(|v| v.0 == [1.0, 0.9, 0.0]));
+    println!("Closest point: {:?}", closest);
+}
+
+impl Mesh {
+    /// 计算与给定方向最接近的顶点
+    pub fn compute_closest_point(
+        &self,
+        origin: [f32; 3],
+        direction: [f32; 3],
+    ) -> Option<([f32; 3], f32)> {
+        compute_closest_point(&self.vertices, origin, direction)
+    }
+
+    pub fn compute_intersecting_face(
+        &self,
+        origin: [f32; 3],
+        direction: [f32; 3],
+    ) -> Option<([u16; 3], [f32; 3])> {
+        let direction = glam::vec3(direction[0], direction[1], direction[2]).normalize();
+        let origin = glam::vec3(origin[0], origin[1], origin[2]);
+
+        let mut intersected_face: Option<([u16; 3], [f32; 3])> = None;
+        let mut min_t = f32::MAX;
+        for chunk in self.indices.chunks(3) {
+            if chunk.len() == 3 {
+                let v0 = glam::vec3(
+                    self.vertices[chunk[0] as usize][0],
+                    self.vertices[chunk[0] as usize][1],
+                    self.vertices[chunk[0] as usize][2],
+                );
+                let v1 = glam::vec3(
+                    self.vertices[chunk[1] as usize][0],
+                    self.vertices[chunk[1] as usize][1],
+                    self.vertices[chunk[1] as usize][2],
+                );
+                let v2 = glam::vec3(
+                    self.vertices[chunk[2] as usize][0],
+                    self.vertices[chunk[2] as usize][1],
+                    self.vertices[chunk[2] as usize][2],
+                );
+
+                // Möller–Trumbore intersection algorithm
+                // https://zhuanlan.zhihu.com/p/451582864
+                let edge1 = v1 - v0;
+                let edge2 = v2 - v0;
+                let s = origin - v0;
+                let s1 = direction.cross(edge2);
+                let s2 = s.cross(edge1);
+                let s1e1 = s1.dot(edge1);
+
+                let t = s2.dot(edge2) / s1e1;
+                if t >= min_t {
+                    continue;
+                }
+                let b1 = s1.dot(s) / s1e1;
+                let b2 = s2.dot(direction) / s1e1;
+                if s1e1.abs() > 1e-6 && t >= 0.0 && b1 >= 0.0 && b2 >= 0.0 && (b1 + b2) <= 1.0 {
+                    intersected_face = Some((chunk.try_into().unwrap(), (t * direction + origin).into()));
+                    min_t = t;
+                }
+            }
+        }
+
+        intersected_face
+    }
+}
+
+#[test]
+fn test_compute_intersecting_face() {
+    let mesh = Mesh {
+        vertices: vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        normals: vec![],
+        tex_coords: vec![],
+        indices: vec![0, 1, 2, 0, 1, 3],
+    };
+    let origin = [0.1, 0.1, -1.0];
+    let direction = [0.0, 0.0, 1.0];
+    let intersected = mesh.compute_intersecting_face(origin, direction);
+    assert!(intersected.is_some());
+    println!("Intersected face: {:?}", intersected);
+}
