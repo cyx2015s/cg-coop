@@ -173,6 +173,7 @@ fn main() {
     let phong_program = shader::create_shader(&display, phong_vertex_path, phong_fragment_path);
 
     let mut scene = Scene::new();
+    let mut selected_vertex_index: Option<usize> = None;
 
     let debug_sphere_mesh = cg_coop::shape::sphere::Sphere {
         radius: 0.05,
@@ -468,8 +469,60 @@ fn main() {
                                     }
                                     
                                 }
+                            } else {
+                                ui.text("模型已网格化，只能编辑顶点位置和UV映射。");
+                                if ui.is_mouse_clicked(imgui::MouseButton::Left) && !ui.is_any_item_focused() && !ui.is_any_item_hovered(){
+                                    // 尝试选中顶点
+                                    let mouse_pos = ui.io().mouse_pos;
+                                    let [win_w, win_h] = ui.io().display_size;
+                                    let ndc_x = (2.0 * mouse_pos[0]) / win_w - 1.0;
+                                    let ndc_y = 1.0 - (2.0 * mouse_pos[1]) / win_h;
+                                    let ndc_pos = glam::Vec3::new(ndc_x, ndc_y, 1.0);
+                                    let inv_proj = glam::Mat4::from_cols_array_2d(&camera.get_projection_matrix()).inverse();
+                                    let inv_view = glam::Mat4::from_cols_array_2d(&camera.get_view_matrix()).inverse();
+                                    let ray_dir_camera = (inv_proj * ndc_pos.extend(1.0)).truncate().normalize();
+                                    let ray_dir_world = (inv_view * ray_dir_camera.extend(0.0)).truncate().normalize();
+                                    let ray_origin = glam::Vec3::from(camera.get_position());
+                                    match obj.mesh.compute_closest_point(
+                                        ray_origin.to_array(),
+                                        ray_dir_world.to_array()
+                                    ) {
+                                        Some((pt, cos_angle)) => {
+                                            // 找到最近点，标记选中
+                                            if cos_angle < 0.99 {
+                                                selected_vertex_index = None;
+                                                return;
+                                            }
+                                            for (i, v) in obj.mesh.vertices.iter().enumerate() {
+                                                let v_pos = glam::Vec3::from(*v);
+                                                if (v_pos - glam::Vec3::from(pt)).length() < 0.1 {
+                                                    selected_vertex_index = Some(i);
+                                                    break;
+                                                }
+                                            }
+                                        },
+                                        None => {
+                                            selected_vertex_index = None;
+                                        }
+                                    }
+                                }
                             }
-                            
+                            match selected_vertex_index {
+                                Some(idx) => {
+                                    ui.text_colored([1.0, 1.0, 0.0, 1.0], &format!("编辑顶点 {}", idx));
+                                    let v = &mut obj.mesh.vertices[idx];
+                                    if Drag::new("X").speed(0.01).build(ui, &mut v[0]) {}
+                                    if Drag::new("Y").speed(0.01).build(ui, &mut v[1]) {}
+                                    if Drag::new("Z").speed(0.01).build(ui, &mut v[2]) {}
+                                    
+                                    let t = &mut obj.mesh.tex_coords[idx];
+                                    if Drag::new("U").speed(0.01).build(ui, &mut t[0]) {}
+                                    if Drag::new("V").speed(0.01).build(ui, &mut t[1]) {}
+                                },
+                                None => {
+                                    ui.text("未选中顶点");
+                                }
+                            }
                             ui.separator();
                             ui.checkbox("显示/隐藏", &mut obj.visible);
                             ui.checkbox("启用纹理贴图", &mut obj.use_texture);
