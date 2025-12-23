@@ -3,15 +3,18 @@
 in vec3 v_position;
 in vec3 v_normal;
 in vec2 v_tex_coord; 
-in vec4 v_frag_pos_light_space;
 
 out vec4 color;
 
+uniform mat4 view;
 uniform vec3 viewPos;
 uniform sampler2D diffuse_tex;
 uniform bool has_texture; 
+uniform int cascadeCount;
 
-uniform sampler2D shadow_map;
+uniform sampler2DArray shadow_map;
+
+
 
 struct Light {
     vec3 color;
@@ -33,6 +36,15 @@ struct Material {
     float ns;
 };
 
+struct LightSpaceMatrix {
+    mat4 matrix;
+};
+
+layout(std140) uniform CascadeZfarsUbo  {
+    vec4 cascade_zfars;
+};
+
+
 layout(std140) uniform Light_Block {
     Light lights[32];
     int num_lights;
@@ -42,36 +54,9 @@ layout(std140) uniform Material_Block {
     Material material;
 };
 
-// 阴影计算函数
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
-    // 1. 执行透视除法
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    // 2. 变换到 [0,1] 的范围
-    projCoords = projCoords * 0.5 + 0.5;
-
-    // 3. 如果超过视锥体远平面，不仅行阴影计算
-    if(projCoords.z > 1.0)
-        return 0.0;
-
-    // 4. 计算 Bias (偏移量) 防止阴影痤疮
-    // 根据表面法线和光线的夹角动态调整 bias
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
-
-    // 5. PCF 柔化边缘
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadow_map, 0);
-    // 采样周围 3x3 区域
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(shadow_map, projCoords.xy + vec2(x, y) * texelSize).r; 
-            // 比较深度：如果贴图里的深度 < 当前深度 - bias，说明在阴影里
-            shadow += (projCoords.z - bias > pcfDepth ? 1.0 : 0.0);        
-        }    
-    }
-    shadow /= 9.0;
-    
-    return shadow;
-}
+layout(std140) uniform LightSpaceMatrix_Block {
+    LightSpaceMatrix light_space_matrix[128];
+};
 
 vec3 getDiffuseColor() {
     if (has_texture) {
@@ -90,14 +75,46 @@ vec3 calcAmbientLight(Light l) {
 }
 
 // 平行光计算，增加 shadow 参数
-vec3 calcDirectionalLight(Light l, vec3 normal, float shadow) {
+vec3 calcDirectionalLight(Light l, int i, vec3 normal) {
+    vec4 fragPosViewSpace = view * vec4(v_position, 1.0);;
+    float depthValue = abs(fragPosViewSpace.z);
+    float shadow = 0.0;
+
+    int layer = -1;
+    for(int j =1; j < cascadeCount + 1; ++j){
+        if( depthValue < cascade_zfars[j]){
+            layer = j - 1;
+            break;
+        }
+    }
+    if(layer == -1){
+        layer = cascadeCount - 1;
+    }
+    float bias = max(0.05 * (1 - dot(normal, -l.direction)),0.005);
+    vec4 fPositionLightSpace = light_space_matrix[i * cascadeCount + layer].matrix * vec4(v_position, 1.0);
+
+    vec3 projCoords = fPositionLightSpace.xyz / fPositionLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    float currentDepth = projCoords.z;
+
+    vec2 texelSize = 1.0 / textureSize(shadow_map, 0).xy;
+    for(int x = -2; x <= 2; ++x){
+        for(int y = -2; y <= 2; ++y){
+            float pcfDepth = texture(shadow_map, vec3(projCoords.xy + vec2(x, y) * texelSize, i * cascadeCount + layer)).r;
+            if(currentDepth - bias > pcfDepth){
+                shadow += 1.0;
+            }
+        }
+    }
+    shadow /= 25.0;
+
     vec3 lightDir = normalize(-l.direction);
     vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * getDiffuseColor();
     vec3 reflectDir = reflect(-lightDir, normal); 
     
     vec3 viewDir = normalize(viewPos - v_position);
     vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks; 
-
+    
     return l.intensity * ((1.0 - shadow) * (diffuse + spec));
 }
 
@@ -130,20 +147,11 @@ vec3 calSpotLight(Light l, vec3 normal) {
 void main() {
     vec3 normal = normalize(v_normal);
     vec3 light_color = vec3(0.0f);
-    float shadow = 0.0;
-    
-    for (int i = 0; i < num_lights; i++) {
-        if (lights[i].light_type == 1) { // Directional
-             vec3 lightDir = normalize(-lights[i].direction);
-             shadow = ShadowCalculation(v_frag_pos_light_space, normal, lightDir);
-             break; 
-        }
-    }
 
     for (int i = 0; i < num_lights; i++) {
         switch (lights[i].light_type) {
             case 0: light_color += calcAmbientLight(lights[i]); break;
-            case 1: light_color += calcDirectionalLight(lights[i], normal, shadow); break; // 传入 shadow
+            case 1: light_color += calcDirectionalLight(lights[i], i, normal); break; 
             case 2: light_color += calPointLight(lights[i], normal); break;
             case 3: light_color += calSpotLight(lights[i], normal); break;
         }

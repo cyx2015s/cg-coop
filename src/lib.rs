@@ -1,8 +1,8 @@
-pub mod base;
-pub mod camera;
-pub mod ctx;
-pub mod macros;
-pub mod shader;
-pub mod shape;
+pub mod ui;
+pub mod render;
+pub mod scene;
 pub use glium;
-pub use macros::implement_uniform_block_new;
+pub mod macros;
+pub mod core;
+pub mod geometry;
+

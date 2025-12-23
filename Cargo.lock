@@ -352,6 +352,7 @@ dependencies = [
  "glam",
  "glium",
  "gltf",
+ "glutin",
  "image",
  "imgui",
  "imgui-glium-renderer",
