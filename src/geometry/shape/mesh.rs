@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use glam::Vec3;
 
 use crate::core::math::aabb::AABB;
 
@@ -150,6 +149,14 @@ impl Mesh {
 
     pub fn get_vertices(&self) -> &[[f32; 3]]  {
         &self.vertices
+    }
+
+    pub fn get_tex_coords(&self) -> &[[f32; 2]] {
+        &self.tex_coords
+    }
+
+    pub fn get_normals(&self) -> &[[f32; 3]] {
+        &self.normals
     }
 
     pub fn get_vertex(&self, index: usize) -> &[f32; 3] {

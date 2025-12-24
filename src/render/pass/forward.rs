@@ -1,5 +1,5 @@
 use crate::render::shader::{ create_program, paths };
-use crate::core::vertex::{ Vertex, Normal };
+use crate::core::vertex::{ Vertex };
 use crate::scene::World;
 use crate::scene::light::LightBlock;
 use crate::core::material;
@@ -156,16 +156,22 @@ impl ForwardPass{
                 let m_block = material::MaterialBlock { material: obj.material };
                 self.material_ubo.write(&m_block);
 
-                let vertex_data: Vec<Vertex> = obj.mesh.vertices.iter()
-                    .zip(obj.mesh.tex_coords.iter())
-                    .map(|(v, t)| Vertex { position: *v, tex_coord: *t })
-                    .collect();
-                let normal_data: Vec<Normal> = obj.mesh.normals.iter().map(|n| Normal { normal: *n }).collect();
+                let count = obj.mesh.vertices.len();
+                assert_eq!(count, obj.mesh.tex_coords.len());
+                assert_eq!(count, obj.mesh.normals.len());
 
+                let mut vertex_data = Vec::with_capacity(count);
+
+                for i in 0..count {
+                    vertex_data.push(Vertex {
+                        position: obj.mesh.vertices[i],
+                        tex_coord: obj.mesh.tex_coords[i],
+                        normal: obj.mesh.normals[i],
+                    });
+                }
                 if vertex_data.is_empty() { continue; }
 
-                let positions = glium::VertexBuffer::new(display, &vertex_data).unwrap();
-                let normals = glium::VertexBuffer::new(display, &normal_data).unwrap();
+                let vertices = glium::VertexBuffer::new(display, &vertex_data).unwrap();
 
                 let indices = glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &obj.mesh.indices).unwrap();
 
@@ -184,7 +190,7 @@ impl ForwardPass{
                 
                 self.cascade_zfars_ubo.write(&cascade_zfar_block);
                 target.draw(
-                    (&positions, &normals),
+                    (&vertices),
                     &indices,
                     &self.program,
                     &uniform! { 

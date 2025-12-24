@@ -376,7 +376,7 @@ impl ShadowPass {
 
             let vertices: Vec<Vertex> = obj.mesh.vertices.iter()
                 .zip(obj.mesh.tex_coords.iter())
-                .map(|(v, t)| Vertex { position: *v, tex_coord: *t })
+                .map(|(v, t)| Vertex { position: *v, tex_coord: *t, normal: [0.0, 0.0, 0.0] })
                 .collect();
             
             if vertices.is_empty() { continue; }
@@ -411,8 +411,8 @@ fn cube_lines_from_corners(c: &[[f32; 3]; 8]) -> Vec<Vertex> {
 
     let mut v = Vec::new();
     for (a, b) in edges {
-        v.push(Vertex { position: c[a], tex_coord: [0.0, 0.0] });
-        v.push(Vertex { position: c[b], tex_coord: [0.0, 0.0] });
+        v.push(Vertex { position: c[a], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
+        v.push(Vertex { position: c[b], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
     }
     v
 }

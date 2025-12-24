@@ -113,6 +113,7 @@ impl SceneRenderer {
         }
         self.debug_pass.render(target, display, world);
 
+
         // self.shadow_pass.draw_debug_light_boxes_solid(target, display, world);
     }
 

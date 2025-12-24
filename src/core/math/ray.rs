@@ -2,7 +2,7 @@ use glam::f32::Vec3;
 pub struct Ray{
     pub o : Vec3,
     pub d : Vec3,
-    pub tMax : f32,
+    pub t_max : f32,
 }
 
 impl Ray{
@@ -10,7 +10,7 @@ impl Ray{
         Self{
             o,
             d,
-            tMax:f32::INFINITY,
+            t_max:f32::INFINITY,
         }
     }
 

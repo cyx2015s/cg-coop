@@ -62,7 +62,7 @@ impl DebugPass {
                     ..Default::default()
                 };
                 let vertex_data: Vec<Vertex> = control_points.iter()
-                    .map(|v| Vertex { position: *v, tex_coord: [0.0; 2] })
+                    .map(|v| Vertex { position: *v, tex_coord: [0.0; 2], normal: [0.0; 3] })
                     .collect();
                 let debug_vbo = glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap();
                 target.draw(
