@@ -236,8 +236,8 @@ impl UIBuild for World {
 
 impl UIHandle for World {
     fn handle_ui_input(&mut self, ui: &mut imgui::Ui, display: &glium::Display<WindowSurface>) {
-        let mut mouse_click_center = None;
-        let mut mouse_click_inf = None;
+        let mut mouse_click_near = None;
+        let mut mouse_click_far = None;
         if let Some(idx) = self.get_selected_camera() {
             let camera = &mut self.cameras[idx].camera;
             let current_time = Instant::now();
@@ -320,19 +320,18 @@ impl UIHandle for World {
                 let [win_w, win_h] = ui.io().display_size;
                 let ndc_x = (2.0 * mouse_pos[0]) / win_w - 1.0;
                 let ndc_y: f32 = 1.0 - (2.0 * mouse_pos[1]) / win_h;
-                let ndc_pos = glam::Vec3::new(ndc_x, ndc_y, 1.0);
+                let ndc_far = glam::Vec3::new(ndc_x, ndc_y, 1.0);
+                let ndc_near = glam::Vec3::new(ndc_x, ndc_y, -1.0);
                 let inv_proj =
                     glam::Mat4::from_cols_array_2d(&camera.get_projection_matrix()).inverse();
                 let inv_view = glam::Mat4::from_cols_array_2d(&camera.get_view_matrix()).inverse();
-                let ray_dir_camera = (inv_proj * ndc_pos.extend(1.0)).truncate().normalize();
-                mouse_click_inf = Some(
-                    (inv_view * ray_dir_camera.extend(0.0))
-                        .truncate()
-                        .normalize(),
-                );
-                mouse_click_center = Some(
-                    (inv_view * glam::Vec3::from(camera.get_position()).extend(1.0)).truncate(),
-                );
+                let world_far = inv_view * inv_proj * ndc_far.extend(1.0);
+                let world_near = inv_view * inv_proj * ndc_near.extend(1.0);
+                let world_far = world_far.truncate() / world_far.w;
+                let world_near = world_near.truncate() / world_near.w;
+                mouse_click_far = Some(world_far);
+                mouse_click_near = Some(world_near);
+
             }
 
             if camera.move_state == camera::MoveState::PanObit {
@@ -341,20 +340,20 @@ impl UIHandle for World {
         }
 
         // 顶点选择
-        if let (Some(mouse_click_center), Some(mouse_click_inf)) =
-            (mouse_click_center, mouse_click_inf)
+        if let (Some(mouse_click_near), Some(mouse_click_far)) =
+            (mouse_click_near, mouse_click_far)
         {
             if let Some(game_obj) = self.get_selected_mut() {
                 if (game_obj.kind == ShapeKind::Imported) {
                     let inv_model = game_obj.transform.get_matrix().inverse();
-                    let local_mouse_click_center = inv_model * mouse_click_center.extend(1.0);
-                    let local_mouse_click_inf = inv_model * mouse_click_inf.extend(0.0);
-                    let local_ray_o = local_mouse_click_center.truncate();
-                    let local_ray_d = (local_mouse_click_inf.truncate() - local_ray_o).normalize();
+                    let local_mouse_click_near = inv_model * mouse_click_near.extend(1.0);
+                    let local_mouse_click_far = inv_model * mouse_click_far.extend(1.0);
+                    let local_ray_o = local_mouse_click_near.truncate();
+                    let local_ray_d = (local_mouse_click_far.truncate() - local_ray_o).normalize();
                     let camera_ray = ray::Ray {
                         o: local_ray_o,
                         d: local_ray_d,
-                        tMax: f32::INFINITY,
+                        t_max: f32::INFINITY,
                     };
                     match game_obj
                         .mesh

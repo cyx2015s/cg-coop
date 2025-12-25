@@ -66,8 +66,13 @@ impl DebugPass {
                     point_size: Some(10.0),
                     ..Default::default()
                 };
-                let vertex_data: Vec<Vertex> = control_points.iter()
-                    .map(|v| Vertex { position: *v, tex_coord: [0.0; 2], normal: [0.0; 3] })
+                let vertex_data: Vec<Vertex> = control_points
+                    .iter()
+                    .map(|v| Vertex {
+                        position: *v,
+                        tex_coord: [0.0; 2],
+                        normal: [0.0; 3],
+                    })
                     .collect();
                 let debug_vbo = glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap();
                 target
@@ -104,6 +109,7 @@ impl DebugPass {
                 let vertex_data: Vec<Vertex> = vec![Vertex {
                     position: debug_vertex,
                     tex_coord: [0.0; 2],
+                    normal: [0.0; 3],
                 }];
                 let debug_vbo = glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap();
                 target
