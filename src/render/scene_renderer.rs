@@ -1,5 +1,6 @@
 use super::pass::{ShadowPass, ForwardPass, QuadPass, DebugPass};
 
+use crate::render::pass::SkyboxPass;
 use crate::scene::light::{LightBlock, Light};
 use crate::scene::World;
 use crate::implement_uniform_block_new;
@@ -38,6 +39,7 @@ pub struct SceneRenderer {
     pub forward_pass: ForwardPass,
     pub quad_pass: QuadPass,
     pub debug_pass: DebugPass,
+    pub skybox_pass: SkyboxPass,
 }
 
 impl SceneRenderer {
@@ -81,6 +83,7 @@ impl SceneRenderer {
             forward_pass: ForwardPass::new(display, light_space_matrix_ubo, light_block_ubo),
             quad_pass: QuadPass::new(display),
             debug_pass: DebugPass::new(display),
+            skybox_pass: SkyboxPass::new(display),
         }
     }
 
@@ -92,7 +95,8 @@ impl SceneRenderer {
             let camera = &mut world.cameras[idx].camera;
             camera.aspect = aspect;
         }
-        
+        self.skybox_pass.render(target, display, world);
+
         self.shadow_pass.render(&mut self.shadow_atlas, &mut self.light_matrix_block, display, world);
         
         self.light_block.num_lights = 0;

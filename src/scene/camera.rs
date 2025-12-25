@@ -82,6 +82,15 @@ impl Camera {
         .to_cols_array_2d()
     }
 
+    pub fn get_view_no_translation(&self) -> [[f32; 4]; 4] {
+        glam::f32::Mat4::look_to_rh(
+            glam::f32::Vec3::ZERO,
+            self.transform.get_forward(),
+            glam::f32::Vec3::Y,
+        )
+        .to_cols_array_2d()
+    }
+
     pub fn start_pan_obit(&mut self, angle: f32, raduis: f32, center: [f32; 3]) {
         self.move_state = MoveState::PanObit;
         self.pan_obit_pitch = std::f32::consts::PI * angle / 180.0;
