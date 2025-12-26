@@ -5,15 +5,9 @@ use crate::scene::light::{LightBlock, Light};
 use crate::scene::World;
 use crate::implement_uniform_block_new;
 
-use glium::uniform;
 use glutin::surface::WindowSurface;
 use glium::texture::DepthTexture2dArray;
 
-
-
-const CASCADE_COUNT: usize = 3;
-const MAX_LIGHTS: usize = 32;
-const MAX_CASCADES: usize = MAX_LIGHTS * CASCADE_COUNT;
 const SHADOW_SIZE: u32 = 2048;
 
 #[repr(C, align(16))]

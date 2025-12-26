@@ -8,7 +8,6 @@ use glium::Surface;
 use glium::uniform;
 use glium::texture::{DepthTexture2dArray};
 use glium::Program;
-use gltf::json::extensions::scene;
 use glutin::surface::WindowSurface;
 const CASCADE_COUNT: usize = 3;
 
@@ -200,9 +199,7 @@ impl ShadowPass {
         scene_box: AABB,
     ) -> (glam::Mat4, DebugLightBox) {
 
-        // ===============================
-        // 1. 相机 frustum 角点（世界空间）
-        // ===============================
+
         let frustum_corners =
             Self::get_frustum_corners_world_space(camera_view, fov, aspect, near, far);
 
@@ -212,21 +209,19 @@ impl ShadowPass {
         }
         center /= 8.0;
 
-        // ===============================
-        // 2. 平行光 View 矩阵（RH，前方 -Z）
-        // ===============================
+
         let light_dir = glam::Vec3::from(light_dir).normalize();
         let light_pos = center - light_dir * 100.0;
-
+        let mut up = glam::Vec3::Y;
+        if light_dir.x.abs() < 0.001 && light_dir.z.abs() < 0.001 { 
+            up = glam::Vec3::Z;
+        } 
         let light_view = glam::Mat4::look_at_rh(
             light_pos,
             center,
-            glam::Vec3::Y,
+            up,
         );
 
-        // ===============================
-        // 3. light-view 空间 AABB
-        // ===============================
         let mut min = glam::Vec3::splat(f32::INFINITY);
         let mut max = glam::Vec3::splat(f32::NEG_INFINITY);
 
@@ -239,8 +234,7 @@ impl ShadowPass {
         max = max.max(scene_box.max);
         min = min.min(scene_box.min);
 
-        // ⚠️ 关键：light-view 前方是 -Z
-        // 但 orthographic_rh_gl 需要的是「正的 near / far 距离」
+
         let z_near_raw = -max.z;
         let z_far_raw  = -min.z;
 
@@ -249,9 +243,6 @@ impl ShadowPass {
         let z_near = (z_near_raw - padding).max(0.0);
         let z_far  = z_far_raw + padding;
 
-        // ===============================
-        // 4. Texel snapping（只对 XY）
-        // ===============================
         let shadow_map_size = 2048.0;
 
         let extent_x = max.x - min.x;
@@ -266,9 +257,7 @@ impl ShadowPass {
         max.x = min.x + shadow_map_size * texel_size_x;
         max.y = min.y + shadow_map_size * texel_size_y;
 
-        // ===============================
-        // 5. 正交投影（OpenGL RH, Z ∈ [-1, 1]）
-        // ===============================
+
         let light_proj = glam::Mat4::orthographic_rh_gl(
             min.x, max.x,
             min.y, max.y,
@@ -277,10 +266,6 @@ impl ShadowPass {
 
         let light_space = light_proj * light_view;
 
-        // ===============================
-        // 6. Debug：世界空间包围盒
-        // ===============================
-        // ⚠️ 这里的 Z 是 light-view 空间的真实 Z（负号！）
         let light_space_corners = [
             [min.x, min.y, -z_near],
             [max.x, min.y, -z_near],
@@ -402,20 +387,20 @@ impl ShadowPass {
     
 }
 
-fn cube_lines_from_corners(c: &[[f32; 3]; 8]) -> Vec<Vertex> {
-    let edges = [
-        (0,1),(1,2),(2,3),(3,0),
-        (4,5),(5,6),(6,7),(7,4),
-        (0,4),(1,5),(2,6),(3,7),
-    ];
+// fn cube_lines_from_corners(c: &[[f32; 3]; 8]) -> Vec<Vertex> {
+//     let edges = [
+//         (0,1),(1,2),(2,3),(3,0),
+//         (4,5),(5,6),(6,7),(7,4),
+//         (0,4),(1,5),(2,6),(3,7),
+//     ];
 
-    let mut v = Vec::new();
-    for (a, b) in edges {
-        v.push(Vertex { position: c[a], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
-        v.push(Vertex { position: c[b], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
-    }
-    v
-}
+//     let mut v = Vec::new();
+//     for (a, b) in edges {
+//         v.push(Vertex { position: c[a], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
+//         v.push(Vertex { position: c[b], tex_coord: [0.0, 0.0], normal: [0.0, 0.0, 0.0] });
+//     }
+//     v
+// }
 
 fn cube_solid_from_corners(c: &[[f32; 3]; 8])
     -> (Vec<DebugVertex>, Vec<u16>)

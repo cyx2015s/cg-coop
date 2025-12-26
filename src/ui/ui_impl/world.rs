@@ -6,7 +6,7 @@ use crate::ui::{UIBuild, UIHandle};
 use imgui::Condition;
 
 use glutin::surface::WindowSurface;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 impl UIBuild for World {
     fn build_ui(&mut self, ui: &imgui::Ui) {
@@ -280,6 +280,13 @@ impl UIHandle for World {
 
             // 其余控制键
             {
+                if ui.is_key_pressed(imgui::Key::K) {
+                    camera.move_state = if camera.move_state == camera::MoveState::RigidBody {
+                        camera::MoveState::Locked
+                    } else {
+                        camera::MoveState::RigidBody
+                    };
+                }
                 if ui.is_key_pressed(imgui::Key::V) {
                     camera.move_state = if camera.move_state == camera::MoveState::Free {
                         camera::MoveState::Locked
@@ -298,16 +305,14 @@ impl UIHandle for World {
                     camera.fovy = 3.141592 / 2.0;
                 }
                 if ui.is_key_pressed(imgui::Key::P) {
-                    let image: glium::texture::RawImage2d<'_, u8> =
-                        display.read_front_buffer().unwrap();
-                    let image = image::ImageBuffer::from_raw(
-                        image.width,
-                        image.height,
-                        image.data.into_owned(),
-                    )
-                    .unwrap();
+                    let now = SystemTime::now();
+                    let duration = now.duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards");
+                    let timestamp = duration.as_secs();
+                    let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
+                    let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
                     let image = image::DynamicImage::ImageRgba8(image).flipv();
-                    image.save("screenshot.png").unwrap();
+                    image.save("/saved/screenshot/screenshot_".to_owned() + &timestamp.to_string() +".png").unwrap();
                 }
             }
 
@@ -344,7 +349,7 @@ impl UIHandle for World {
             (mouse_click_near, mouse_click_far)
         {
             if let Some(game_obj) = self.get_selected_mut() {
-                if (game_obj.kind == ShapeKind::Imported) {
+                if game_obj.kind == ShapeKind::Imported {
                     let inv_model = game_obj.transform.get_matrix().inverse();
                     let local_mouse_click_near = inv_model * mouse_click_near.extend(1.0);
                     let local_mouse_click_far = inv_model * mouse_click_far.extend(1.0);

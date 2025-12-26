@@ -1,4 +1,4 @@
-use crate::scene::world::{ GameObject, ShapeKind };
+use crate::scene::world::{ BodyType, GameObject, ShapeKind };
 use imgui::{ Condition, Drag};
 use crate::ui::UIBuild;
 
@@ -48,10 +48,10 @@ impl UIBuild for GameObject {
                     ShapeKind::Nurbs { control_points, weights, current_nurbs_idx, .. } => {
                         ui.text("NURBS 控制点编辑");
 
-                        // 1️⃣ 确保 idx 一定存在（没有就初始化为 0）
+                        // 确保 idx 一定存在（没有就初始化为 0）
                         let idx = current_nurbs_idx;
 
-                        // 2️⃣ ImGui Slider 直接绑定 usize
+                        // ImGui Slider 直接绑定 usize
                         ui.slider( "点索引", 0, control_points.len().saturating_sub(1), idx);
 
                         if *idx < control_points.len() {
@@ -102,6 +102,9 @@ impl UIBuild for GameObject {
                             transform: self.transform.clone(),
                             material: self.material,
                             mesh: self.mesh.clone(),
+                            body_type: self.body_type,
+                            velocity: self.velocity,
+                            restitution: self.restitution,
                             kind: ShapeKind::Imported,
                             visible: self.visible,
                             use_texture: self.use_texture,
@@ -133,6 +136,21 @@ impl UIBuild for GameObject {
                 ui.checkbox("显示/隐藏", &mut self.visible);
                 ui.checkbox("启用纹理贴图", &mut self.use_texture);
                 if ui.button("保存当前模型") { let _ = self.mesh.save_obj("output.obj"); }
+                ui.separator();
+
+                ui.text("物理属性(Physics)");
+
+                let is_dynamic = self.body_type == BodyType::Dynamic;
+                if ui.radio_button_bool("自由物体(Dynamic}", is_dynamic){
+                    self.set_body_type(BodyType::Dynamic);
+                }
+                if ui.radio_button_bool("静态物体(Static)", !is_dynamic){
+                    self.set_body_type(BodyType::Static);
+                }
+
+                if self.body_type == BodyType::Dynamic {
+                    Drag::new("弹性系数").speed(0.01).range(0.0, 1.0).build(ui, &mut self.restitution);
+                }
             });
     }
 }

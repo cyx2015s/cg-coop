@@ -1,5 +1,4 @@
 use glium::{Surface, texture::{RawImage2d, Texture2dArray}};
-use gltf::camera::Projection;
 use glutin::surface::WindowSurface;
 
 use crate::{render::shader::create_program, scene::World};

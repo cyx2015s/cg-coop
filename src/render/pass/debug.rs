@@ -1,17 +1,14 @@
-use std::any::{Any, TypeId};
 
-use glium::index::PrimitiveType;
+
 use glium::uniform;
 use glium::{Program, Surface};
 use glutin::surface::WindowSurface;
 
 use crate::core::vertex::Vertex;
-use crate::geometry::shape::cube::Cube;
-use crate::render::shader::{create_program, paths};
+
+use crate::render::shader::{create_program};
 use crate::scene::world::ShapeKind;
 use crate::scene::world::World;
-
-const CASCADE_COUNT: usize = 3;
 
 pub struct DebugPass {
     program: Program,

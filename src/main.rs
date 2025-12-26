@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use cg_coop::render::SceneRenderer;
 use cg_coop::scene::World;
 use cg_coop::ui::{ UIBuild, UIHandle};
@@ -17,7 +19,7 @@ fn main() {
     .build(&event_loop);
 
     let mut global_ctx = cg_coop::ui::ctx::GlobalContext::new(&display, &window);
-
+    let mut last_frame = Instant::now();
     let mut scene_renderer = SceneRenderer::new(&display);
     let mut scene = World::new();
     scene.init_scene_1(&display);
@@ -37,6 +39,7 @@ fn main() {
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::RedrawRequested => {
+                    
                     global_ctx.update_time();
                     let mut target = display.draw();
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
@@ -54,6 +57,10 @@ fn main() {
                     scene.build_ui(ui);
 
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0); 
+                    let now = Instant::now();
+                    let dt = (now - last_frame).as_secs_f32();
+                    last_frame = now;
+                    scene.step(dt);
                     scene_renderer.render(&display, &mut scene,&mut target);
                     
 

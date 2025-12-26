@@ -49,6 +49,9 @@ impl AABB{
 
     //     return tMin < tMax && tMax > 0.0 && tMin < ray.tMax;
     // }
+    pub fn get_half_extents(&self) -> Vec3 { 
+        (self.max - self.min) * 0.5
+    }
 
     pub fn get_global_aabb(&self, model_matrix:glam::f32::Mat4) -> AABB { 
         let center = (self.min + self.max) * 0.5;

@@ -1,5 +1,4 @@
 use glium::implement_vertex;
-use glium::uniforms::Uniforms;
 use glium::{Surface, Program};
 use glium::vertex::VertexBuffer;
 use glium::index::{NoIndices, PrimitiveType};

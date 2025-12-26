@@ -180,17 +180,17 @@ impl ForwardPass{
                 } else {
                     &self.default_texture
                 };
-                let cascadeCount:i32 = 3;
+                let cascade_count:i32 = 3;
                 let splits = crate::render::pass::shadow::ShadowPass::get_cascade_distances(camera_obj.camera.znear, camera_obj.camera.zfar);
                 let mut cascade_zfar_block = CascadeZfarsUbo{ cascade_zfars: [0.0; 4]};
 
-                for i in 0..(cascadeCount+1) {
+                for i in 0..(cascade_count+1) {
                     cascade_zfar_block.cascade_zfars[i as usize] = splits[i as usize];
                 }
                 
                 self.cascade_zfars_ubo.write(&cascade_zfar_block);
                 target.draw(
-                    (&vertices),
+                    &vertices,
                     &indices,
                     &self.program,
                     &uniform! { 
@@ -198,7 +198,7 @@ impl ForwardPass{
                         view: view, 
                         perspective: perspective,
                         viewPos: view_pos,
-                        cascadeCount: cascadeCount,
+                        cascadeCount: cascade_count,
                         CascadeZfarsUbo : &self.cascade_zfars_ubo,
                         Material_Block: &self.material_ubo,
                         Light_Block: &self.light_block_ubo,

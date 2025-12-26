@@ -7,9 +7,16 @@ use crate::core::math::aabb::AABB;
 use crate::geometry::shape::mesh::{ AsMesh, Mesh};
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
+use crate::physics::collision::{apply_gravity, predict_position, resolve_collision};
 
 use std::time::Instant;
 use glutin::surface::WindowSurface;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BodyType {
+    Static,   // 固定物体
+    Dynamic,  // 自由物体
+}
 
 
 #[derive(Clone, PartialEq)]
@@ -48,7 +55,10 @@ pub enum ShapeKind {
 pub struct GameObject {
     pub name: String,
     pub transform: Transform,
+    pub velocity: [f32; 3],
     pub material: Material,
+    pub body_type: BodyType,
+    pub restitution: f32,
     pub mesh: Mesh,
     pub kind: ShapeKind,
     pub visible: bool,
@@ -81,7 +91,10 @@ impl GameObject {
                 indices: vec![],
                 aabb: AABB::default(),
             },
+            velocity: [0.0, 0.0, 0.0],
             kind,
+            body_type: BodyType::Static,
+            restitution: 0.0,   
             visible: true,
             use_texture: false,
             selected_vertex_index: None,
@@ -90,6 +103,21 @@ impl GameObject {
         obj
     }
 
+    pub fn aabb(&self) -> AABB {
+        let half_size = (self.mesh.aabb.max - self.mesh.aabb.min) / 2.0;
+        AABB {
+            min: self.transform.position - half_size,
+            max: self.transform.position + half_size,
+        }
+    }
+
+    pub fn set_body_type(&mut self, new_type: BodyType) {
+        if self.body_type == new_type {
+            return;
+        }
+        self.velocity = [0.0, 0.0, 0.0];
+        self.body_type = new_type;
+    }
     pub fn regenerate_mesh(&mut self) {
         self.mesh = match &self.kind {
             ShapeKind::Cube {
@@ -176,6 +204,7 @@ pub struct World {
     pub debug: bool,
     pub debug_frustum: bool,
     pub layer: usize,
+    pub gravity: [f32; 3],
 }
 
 impl World {
@@ -194,16 +223,45 @@ impl World {
             debug: false,
             debug_frustum: false,
             layer: 0,
+            gravity: [0.0, -9.8, 0.0],
         }
+    }
+
+    pub fn step(&mut self, dt: f32) {
+        
+        for i in 0..self.objects.len() {
+            if self.objects[i].body_type != BodyType::Dynamic { continue; }
+            apply_gravity(&mut self.objects[i], glam::f32::Vec3::from_array(self.gravity), dt);
+
+            let predicted_pos = predict_position(&self.objects[i], dt);
+
+            let mut collided = false;
+            for j in 0..self.objects.len() {
+                if self.objects[j].body_type == BodyType::Static {
+                    let static_aabb = self.objects[j].aabb();
+                    if resolve_collision(
+                        &mut self.objects[i],
+                        &static_aabb,
+                        predicted_pos) {
+                            collided = true;
+                            break;
+                        }
+                }
+            }
+            if !collided {
+                self.objects[i].transform.position = predicted_pos;
+            }
+        }
+
     }
 
     pub fn handle_mouse_move(&mut self, delta: (f64, f64), window: &glium::winit::window::Window){
         if let Some(idx) = self.get_selected_camera() {
             let mouse_state = &mut self.mouse_state;
             let camera = &mut self.cameras[idx].camera;
-            if (camera.move_state == crate::scene::camera::MoveState::Free && !mouse_state.is_locked()) {
+            if camera.move_state == crate::scene::camera::MoveState::Free && !mouse_state.is_locked() {
                 mouse_state.toggle_lock(window);
-            } else if (mouse_state.is_locked() && camera.move_state != crate::scene::camera::MoveState::Free) {
+            } else if mouse_state.is_locked() && camera.move_state != crate::scene::camera::MoveState::Free {
                 mouse_state.toggle_lock(window);
             }
             mouse_state.handle_mouse_move(delta, camera, window);
@@ -356,3 +414,4 @@ impl World {
         None
     }
 }
+

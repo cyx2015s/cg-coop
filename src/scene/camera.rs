@@ -2,6 +2,7 @@ use crate::core::math::transform;
 
 pub enum MoveState {
     Locked,
+    RigidBody,
     Free,
     PanObit,
 }
@@ -10,6 +11,7 @@ impl PartialEq for MoveState {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (MoveState::Locked, MoveState::Locked) => true,
+            (MoveState::RigidBody, MoveState::RigidBody) => true,
             (MoveState::Free, MoveState::Free) => true,
             (MoveState::PanObit, MoveState::PanObit) => true,
             _ => false,
@@ -36,6 +38,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect: f32) -> Self {
+
         Self {
             transform: transform::Transform::default(),
             fovy: 3.141592 / 3.0,
