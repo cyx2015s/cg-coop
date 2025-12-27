@@ -130,7 +130,92 @@ impl UIBuild for World {
 
                 ui.separator();
                 ui.text("高级建模:");
-                if ui.button("NURBS 曲面") {
+                
+                // 这里添加了 NURBS 球体生成逻辑
+                if ui.button("NURBS 球体") {
+                    let r = 1.0; // 半径
+                    let w_corner = 0.70710678; // sqrt(2)/2
+
+                    // V 方向参数 (5行: 南极 -> 赤道 -> 北极)
+                    // 元组格式: (半径缩放系数, Y轴高度, V方向权重)
+                    // 这是一个二次B样条构成的半圆
+                    let v_params = vec![
+                        (0.0, -r, 1.0),      // 南极 (半径0)
+                        (r, -r, w_corner),   // 南方角落控制点 (y=-r, radius=r)
+                        (r, 0.0, 1.0),       // 赤道 (y=0, radius=r)
+                        (r, r, w_corner),    // 北方角落控制点 (y=r, radius=r)
+                        (0.0, r, 1.0),       // 北极 (半径0)
+                    ];
+
+                    // U 方向参数 (9列: 0度 -> 360度)
+                    // 元组格式: (X方向系数, Z方向系数, U方向权重)
+                    // 这是一个二次B样条构成的整圆 (正方形控制网格)
+                    let u_params = vec![
+                        (1.0, 0.0, 1.0),       // 0度
+                        (1.0, 1.0, w_corner),  // 45度
+                        (0.0, 1.0, 1.0),       // 90度
+                        (-1.0, 1.0, w_corner), // 135度
+                        (-1.0, 0.0, 1.0),      // 180度
+                        (-1.0, -1.0, w_corner),// 225度
+                        (0.0, -1.0, 1.0),      // 270度
+                        (1.0, -1.0, w_corner), // 315度
+                        (1.0, 0.0, 1.0),       // 360度(回到起点)
+                    ];
+
+                    let mut control_points = Vec::new();
+                    let mut weights = Vec::new();
+
+                    // 生成 9x5 = 45 个控制点网格
+                    for v_p in &v_params {
+                        for u_p in &u_params {
+                            // 坐标计算: P = (x*rad, y, z*rad)
+                            let x = u_p.0 * v_p.0; 
+                            let z = u_p.1 * v_p.0;
+                            let y = v_p.1;
+                            
+                            control_points.push([x, y, z]);
+                            
+                            // 权重计算: W = W_u * W_v
+                            weights.push(u_p.2 * v_p.2);
+                        }
+                    }
+
+                    // 节点向量 (2阶)
+                    // U: 4段圆弧 (0, 0.25, 0.5, 0.75, 1) -> 需要重复节点来实现圆的完美拼接
+                    let u_knots = vec![
+                        0.0, 0.0, 0.0, 
+                        0.25, 0.25, 
+                        0.5, 0.5, 
+                        0.75, 0.75, 
+                        1.0, 1.0, 1.0
+                    ];
+                    // V: 2段圆弧 (0, 0.5, 1) -> 构成半圆
+                    let v_knots = vec![
+                        0.0, 0.0, 0.0, 
+                        0.5, 0.5, 
+                        1.0, 1.0, 1.0
+                    ];
+
+                    let mut obj = GameObject::new(
+                        "NURBS Sphere",
+                        Box::new(NurbsSurface {
+                            degree: 2,
+                            control_points,
+                            weights,
+                            u_count: 9,
+                            v_count: 5,
+                            splits: 32, // 细分度，越高越圆滑
+                            selected_point_idx: 0,
+                            u_knots,
+                            v_knots,
+                        }),
+                        self.default_mat,
+                    );
+                    obj.transform.position.y = 2.0;
+                    self.add_object(obj);
+                }
+
+                if ui.button("NURBS 曲面 (默认)") {
                     let pts = vec![
                         [-1.5, 0.0, -1.5],
                         [-0.5, 0.5, -1.5],
@@ -160,6 +245,8 @@ impl UIBuild for World {
                             v_count: 4,
                             splits: 32,
                             selected_point_idx: 0,
+                            u_knots: vec![], 
+                            v_knots: vec![],
                         }),
                         self.default_mat,
                     ));
