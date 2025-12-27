@@ -25,6 +25,20 @@ impl UIBuild for CameraObject {
                     100.0,
                     &mut self.camera.zfar,
                 );
+                ui.slider("force", 1.0, 100.0, &mut self.camera.force);
+                ui.slider("up_vel", 0.0, 100.0, &mut self.camera.up_velocity);
+                ui.slider(
+                    "friction_0",
+                    0.0,
+                    10.0,
+                    &mut self.camera.physics.friction[0],
+                );
+                ui.slider(
+                    "friction_2",
+                    0.0,
+                    10.0,
+                    &mut self.camera.physics.friction[2],
+                );
             });
     }
 }

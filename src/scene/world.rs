@@ -1,15 +1,23 @@
 use super::camera::{Camera, MouseState};
-use super::light::{AmbientLight, DirectionalLight, Light, PointLight, SpotLight};
+use super::light::Light;
 
-use crate::core::material::{Material, Phong};
+use crate::core::material::Material;
 use crate::core::math::aabb::AABB;
 use crate::core::math::transform::Transform;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
-use crate::geometry::shape::{cube::Cube, sphere::Sphere};
+use crate::geometry::shape::nurbs::NurbsSurface;
+use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
 use crate::physics::collision::{apply_gravity, predict_position, resolve_collision};
+use crate::physics::rigid::RigidBody;
 
 use glutin::surface::WindowSurface;
 use std::time::Instant;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BodyHandle {
+    Object(usize),
+    Camera(usize),
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BodyType {
@@ -52,8 +60,24 @@ pub enum ShapeKind {
 
 pub struct PhysicalProperties {
     pub velocity: [f32; 3],
+    pub force: [f32; 3],
+    pub friction: [f32; 3],
+    pub mass: f32,
     pub body_type: BodyType,
     pub restitution: f32,
+}
+
+impl Default for PhysicalProperties {
+    fn default() -> Self {
+        Self {
+            velocity: [0.0, 0.0, 0.0],
+            force: [0.0, 0.0, 0.0],
+            friction: [0.0, 0.0, 0.0],
+            mass: 1.0,
+            body_type: BodyType::Static,
+            restitution: 0.0,
+        }
+    }
 }
 
 pub struct RenderProperties {
@@ -91,6 +115,52 @@ pub struct CameraObject {
     pub camera: Camera,
 }
 
+impl RigidBody for CameraObject {
+    fn transform(&self) -> &Transform {
+        &self.camera.transform
+    }
+
+    fn transform_mut(&mut self) -> &mut Transform {
+        &mut self.camera.transform
+    }
+
+    fn velocity(&self) -> [f32; 3] {
+        self.camera.physics.velocity
+    }
+
+    fn velocity_mut(&mut self) -> &mut [f32; 3] {
+        &mut self.camera.physics.velocity
+    }
+
+    fn mass(&self) -> f32 {
+        self.camera.physics.mass
+    }
+
+    fn force(&self) -> [f32; 3] {
+        self.camera.physics.force
+    }
+
+    fn friction(&self) -> [f32; 3] {
+        self.camera.physics.friction
+    }
+
+    fn body_type(&self) -> BodyType {
+        self.camera.physics.body_type
+    }
+
+    fn restitution(&self) -> f32 {
+        self.camera.physics.restitution
+    }
+
+    fn aabb(&self) -> AABB {
+        AABB {
+            min: glam::Vec3::new(-0.3, -0.5, -0.3),
+            max: glam::Vec3::new(0.3, 0.5, 0.3),
+        }
+        .get_global_aabb(self.camera.transform.get_matrix())
+    }
+}
+
 impl GameObject {
     pub fn new(name: &str, shape: Box<dyn EditableMesh>, material: Material) -> Self {
         let mut obj = Self {
@@ -104,11 +174,7 @@ impl GameObject {
                 indices: vec![],
                 aabb: AABB::default(),
             },
-            physics: PhysicalProperties {
-                velocity: [0.0, 0.0, 0.0],
-                body_type: BodyType::Static,
-                restitution: 0.0,
-            },
+            physics: PhysicalProperties::default(),
             rendering: RenderProperties {
                 material,
                 visible: true,
@@ -207,6 +273,44 @@ impl GameObject {
     }
 }
 
+impl RigidBody for GameObject {
+    fn transform(&self) -> &Transform {
+        &self.transform
+    }
+    fn transform_mut(&mut self) -> &mut Transform {
+        &mut self.transform
+    }
+    fn velocity(&self) -> [f32; 3] {
+        self.physics.velocity
+    }
+    fn velocity_mut(&mut self) -> &mut [f32; 3] {
+        &mut self.physics.velocity
+    }
+
+    fn body_type(&self) -> BodyType {
+        self.physics.body_type
+    }
+
+    fn restitution(&self) -> f32 {
+        self.physics.restitution
+    }
+
+    fn force(&self) -> [f32; 3] {
+        self.physics.force
+    }
+
+    fn friction(&self) -> [f32; 3] {
+        self.physics.friction
+    }
+    fn aabb(&self) -> AABB {
+        self.mesh.aabb.get_global_aabb(self.transform.get_matrix())
+    }
+
+    fn mass(&self) -> f32 {
+        self.physics.mass
+    }
+}
+
 pub struct World {
     pub last_frame_time: Instant,
     pub objects: Vec<GameObject>,
@@ -220,6 +324,7 @@ pub struct World {
     pub default_mat: Material,
     pub debug: bool,
     pub debug_frustum: bool,
+    pub camera_force: [bool; 6],
     pub layer: usize,
     pub gravity: [f32; 3],
 }
@@ -242,54 +347,112 @@ impl World {
             selected_camera: None,
             mouse_state: MouseState::default(),
             default_aspect: 16.0 / 9.0,
-            default_mat: Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0)
-                .to_material(),
+            default_mat: Material::PHONG,
             debug: false,
             debug_frustum: false,
             layer: 0,
+            camera_force: [false; 6],
             gravity: [0.0, -9.8, 0.0],
         }
     }
 
     pub fn step(&mut self, dt: f32) {
+        let mut bodies: Vec<BodyHandle> = Vec::new();
         for i in 0..self.objects.len() {
-            if self.objects[i].physics.body_type != BodyType::Dynamic {
-                continue;
-            }
-            apply_gravity(
-                &mut self.objects[i],
-                glam::f32::Vec3::from_array(self.gravity),
-                dt,
-            );
-
-            let predicted_pos = predict_position(&self.objects[i], dt);
-
+            bodies.push(BodyHandle::Object(i));
+        }
+        if let Some(idx) = self.get_selected_camera() {
+            bodies.push(BodyHandle::Camera(idx));
+        }
+        let gravity = glam::f32::Vec3::from_array(self.gravity);
+        for i in 0..bodies.len() {
             let mut collided = false;
-            for j in 0..self.objects.len() {
-                if self.objects[j].physics.body_type == BodyType::Static {
-                    let static_aabb = self.objects[j].aabb();
-                    if resolve_collision(&mut self.objects[i], &static_aabb, predicted_pos) {
-                        collided = true;
-                        break;
+            for j in 0..bodies.len() {
+                if i == j {
+                    continue;
+                }
+                let (a, b) = self.get_two_bodies_mut(bodies[i], bodies[j]);
+                if !a.is_dynamic() {
+                    break;
+                }
+                apply_gravity(a, gravity, dt);
+
+                if resolve_collision(a, b, dt) {
+                    collided = true;
+                    break;
+                }
+            }
+
+            if !collided {
+                match bodies[i] {
+                    BodyHandle::Object(i) => {
+                        let predicted_pos = predict_position(&self.objects[i], dt);
+                        self.objects[i].transform.position = predicted_pos;
+                    }
+                    BodyHandle::Camera(i) => {
+                        let predicted_pos = predict_position(&self.cameras[i], dt);
+                        self.cameras[i].camera.transform.position = predicted_pos;
                     }
                 }
             }
-            if !collided {
-                self.objects[i].transform.position = predicted_pos;
+
+            match bodies[i] {
+                BodyHandle::Camera(i) => {
+                    self.cameras[i].update_velocity(dt);
+                    let predicted_pos = predict_position(&self.cameras[i], dt);
+                    self.cameras[i].camera.transform.position = predicted_pos;
+                }
+                BodyHandle::Object(i) => {}
             }
         }
     }
 
+    fn get_two_bodies_mut(
+        &mut self,
+        a: BodyHandle,
+        b: BodyHandle,
+    ) -> (&mut dyn RigidBody, &mut dyn RigidBody) {
+        match (a, b) {
+            (BodyHandle::Object(i), BodyHandle::Object(j)) => {
+                if i < j {
+                    let (left, right) = self.objects.split_at_mut(i + 1);
+                    (&mut left[i], &mut right[j - i - 1])
+                } else {
+                    let (left, right) = self.objects.split_at_mut(j + 1);
+                    (&mut right[i - j - 1], &mut left[j])
+                }
+            }
+
+            (BodyHandle::Camera(i), BodyHandle::Camera(j)) => {
+                let (left, right) = self.cameras.split_at_mut(j);
+                (&mut left[i], &mut right[0])
+            }
+
+            (BodyHandle::Object(i), BodyHandle::Camera(j)) => {
+                let obj = &mut self.objects[i];
+                let cam = &mut self.cameras[j];
+                (obj, cam)
+            }
+
+            (BodyHandle::Camera(i), BodyHandle::Object(j)) => {
+                let cam = &mut self.cameras[i];
+                let obj = &mut self.objects[j];
+                (cam, obj)
+            }
+        }
+    }
     pub fn handle_mouse_move(&mut self, delta: (f64, f64), window: &glium::winit::window::Window) {
         if let Some(idx) = self.get_selected_camera() {
             let mouse_state = &mut self.mouse_state;
             let camera = &mut self.cameras[idx].camera;
-            if camera.move_state == crate::scene::camera::MoveState::Free
+            if (camera.move_state == crate::scene::camera::MoveState::Free
+                || camera.move_state == crate::scene::camera::MoveState::RigidBody)
                 && !mouse_state.is_locked()
             {
                 mouse_state.toggle_lock(window);
             } else if mouse_state.is_locked()
-                && camera.move_state != crate::scene::camera::MoveState::Free
+                && (camera.move_state != crate::scene::camera::MoveState::Free
+                    && camera.move_state != crate::scene::camera::MoveState::RigidBody)
             {
                 mouse_state.toggle_lock(window);
             }
@@ -300,10 +463,9 @@ impl World {
         let (width, height) = display.get_framebuffer_dimensions();
         let aspect = width as f32 / height as f32;
         self.default_aspect = aspect;
-        self.new_ambient_light("环境光", 0.1, [1.0, 1.0, 1.0]);
+        self.new_ambient_light("环境光");
         self.new_camera("相机", aspect);
-        let default_mat =
-            Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_material();
+        let default_mat = Material::PHONG;
         let mut floor = GameObject::new(
             "Floor",
             Box::new(Cube {
@@ -339,90 +501,41 @@ impl World {
         aabb
     }
     pub fn new_camera(&mut self, name: &str, aspect: f32) {
-        let camera = CameraObject {
+        let mut camera = CameraObject {
             name: name.to_string(),
             camera: Camera::new(aspect),
         };
+        camera.camera.init();
         self.add_camera(camera);
     }
 
-    pub fn new_ambient_light(&mut self, name: &str, intensity: f32, color: [f32; 3]) {
+    pub fn new_ambient_light(&mut self, name: &str) {
         let light = LightObject {
             name: name.to_string(),
-            light: AmbientLight { intensity, color }.to_light(),
+            light: Light::AMBIENT,
         };
         self.add_light(light);
     }
-    pub fn new_directional_light(
-        &mut self,
-        name: &str,
-        position: [f32; 3],
-        direction: [f32; 3],
-        intensity: f32,
-        color: [f32; 3],
-    ) {
+    pub fn new_directional_light(&mut self, name: &str) {
         let light = LightObject {
             name: name.to_string(),
-            light: DirectionalLight {
-                position,
-                direction,
-                intensity,
-                color,
-            }
-            .to_light(),
-        };
-        self.add_light(light);
-    }
-    pub fn new_point_light(
-        &mut self,
-        name: &str,
-        position: [f32; 3],
-        intensity: f32,
-        color: [f32; 3],
-        kc: f32,
-        kl: f32,
-        kq: f32,
-    ) {
-        let light = LightObject {
-            name: name.to_string(),
-            light: PointLight {
-                position,
-                intensity,
-                color,
-                kc,
-                kl,
-                kq,
-            }
-            .to_light(),
+            light: Light::DERECTIONAL,
         };
         self.add_light(light);
     }
 
-    pub fn new_spot_light(
-        &mut self,
-        name: &str,
-        position: [f32; 3],
-        direction: [f32; 3],
-        intensity: f32,
-        color: [f32; 3],
-        kc: f32,
-        kl: f32,
-        kq: f32,
-        angle: f32,
-    ) {
+    pub fn new_point_light(&mut self, name: &str) {
         let light = LightObject {
             name: name.to_string(),
-            light: SpotLight {
-                position,
-                direction,
-                intensity,
-                color,
-                kc,
-                kl,
-                kq,
-                angle,
-            }
-            .to_light(),
+            light: Light::POINT,
+        };
+        self.add_light(light);
+    }
+
+    pub fn new_spot_light(&mut self, name: &str) {
+        let light = LightObject {
+            name: name.to_string(),
+            light: Light::SPOT,
         };
         self.add_light(light);
     }
@@ -434,9 +547,10 @@ impl World {
 
     pub fn get_selected_camera(&self) -> Option<usize> {
         if let Some(idx) = self.selected_camera
-            && idx < self.cameras.len() {
-                return Some(idx);
-            }
+            && idx < self.cameras.len()
+        {
+            return Some(idx);
+        }
         None
     }
 
@@ -447,9 +561,10 @@ impl World {
 
     pub fn get_selected_light(&mut self) -> Option<&mut LightObject> {
         if let Some(idx) = self.selected_light
-            && idx < self.lights.len() {
-                return Some(&mut self.lights[idx]);
-            }
+            && idx < self.lights.len()
+        {
+            return Some(&mut self.lights[idx]);
+        }
         None
     }
     pub fn add_object(&mut self, obj: GameObject) {
@@ -459,9 +574,10 @@ impl World {
 
     pub fn get_selected_mut(&mut self) -> Option<&mut GameObject> {
         if let Some(idx) = self.selected_index
-            && idx < self.objects.len() {
-                return Some(&mut self.objects[idx]);
-            }
+            && idx < self.objects.len()
+        {
+            return Some(&mut self.objects[idx]);
+        }
         None
     }
 }

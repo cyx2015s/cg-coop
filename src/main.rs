@@ -27,20 +27,18 @@ fn main() {
         match ev {
             Event::DeviceEvent { device_id, event } => {
                 if let DeviceEvent::MouseMotion { delta } = event {
-                    
                     scene.handle_mouse_move(delta, &window);
                 }
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::RedrawRequested => {
-                    
                     global_ctx.update_time();
                     let mut target = display.draw();
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
                     let ui = global_ctx.ui_ctx.frame();
                     let _cn_font = ui.push_font(global_ctx.cn_font);
 
-                    ui.show_demo_window(&mut true); 
+                    ui.show_demo_window(&mut true);
 
                     ui.window("操作说明")
                         .size([300.0, 100.0], Condition::FirstUseEver)
@@ -50,13 +48,12 @@ fn main() {
 
                     scene.build_ui(ui);
 
-                    target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0); 
+                    target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
                     let now = Instant::now();
                     let dt = (now - last_frame).as_secs_f32();
                     last_frame = now;
                     scene.step(dt);
                     scene_renderer.render(&display, &mut scene,&mut target);
-                    
 
                     _cn_font.pop();
                     scene.handle_ui_input(ui, &display);

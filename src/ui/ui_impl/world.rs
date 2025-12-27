@@ -4,8 +4,8 @@ use crate::geometry::shape::cylinder::Cylinder;
 use crate::geometry::shape::mesh::Mesh;
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::sphere::Sphere;
-use crate::scene::camera;
 use crate::scene::world::{GameObject, World};
+use crate::scene::{camera, world};
 use crate::ui::{UIBuild, UIHandle};
 use imgui::Condition;
 
@@ -16,7 +16,7 @@ impl UIBuild for World {
     fn build_ui(&mut self, ui: &imgui::Ui) {
         ui.window("场景列表 (Scene List)")
             .size([200.0, 400.0], Condition::FirstUseEver)
-            .position([20.0, 150.0], Condition::FirstUseEver)
+            .position([0.0, 0.0], Condition::FirstUseEver)
             .build(|| {
                 if ui.button("新建相机") {
                     self.new_camera(
@@ -31,36 +31,18 @@ impl UIBuild for World {
                 if ui.button("平行光") {
                     self.new_directional_light(
                         &("Directional Light".to_owned() + self.lights.len().to_string().as_str()),
-                        [0.0, 0.0, 0.0],
-                        [0.0, -1.0, 0.0],
-                        1.0,
-                        [1.0, 1.0, 1.0],
                     );
                 }
                 ui.same_line();
                 if ui.button("点光源") {
                     self.new_point_light(
                         &("Point Light".to_owned() + self.lights.len().to_string().as_str()),
-                        [0.0, 0.0, 0.0],
-                        1.0,
-                        [1.0, 1.0, 1.0],
-                        1.0,
-                        0.09,
-                        0.032,
                     );
                 }
                 ui.same_line();
                 if ui.button("聚光灯") {
                     self.new_spot_light(
                         &("Spot Light".to_owned() + self.lights.len().to_string().as_str()),
-                        [0.0, 0.0, 0.0],
-                        [0.0, -1.0, 0.0],
-                        1.0,
-                        [1.0, 1.0, 1.0],
-                        1.0,
-                        0.09,
-                        0.032,
-                        12.5,
                     );
                 }
 
@@ -165,10 +147,11 @@ impl UIBuild for World {
                     ));
                 }
                 if ui.button("导入模型")
-                    && let Ok(mesh) = Mesh::load_obj("output.obj") {
-                        let obj = GameObject::new("Imported", Box::new(mesh), self.default_mat);
-                        self.add_object(obj);
-                    }
+                    && let Ok(mesh) = Mesh::load_obj("output.obj")
+                {
+                    let obj = GameObject::new("Imported", Box::new(mesh), self.default_mat);
+                    self.add_object(obj);
+                }
 
                 ui.separator();
                 ui.text("场景物体:");
@@ -222,18 +205,18 @@ impl UIBuild for World {
             obj.build_ui(ui);
         }
 
-        ui.window("调试操作")
-            .size([200.0, 400.0], Condition::FirstUseEver)
-            .position([20.0, 150.0], Condition::FirstUseEver)
-            .build(|| {
-                let items = [
-                    "layer 0", "layer 1", "layer 2", "layer 3", "layer 4", "layer 5", "layer 6",
-                    "layer 7",
-                ];
-                ui.checkbox("检查阴影贴图", &mut self.debug);
-                ui.combo_simple_string("Layer", &mut self.layer, &items);
-                ui.checkbox("视锥体显示", &mut self.debug_frustum)
-            });
+        // ui.window("调试操作")
+        //     .size([200.0, 400.0], Condition::FirstUseEver)
+        //     .position([20.0, 150.0], Condition::FirstUseEver)
+        //     .build(|| {
+        //         let items = [
+        //             "layer 0", "layer 1", "layer 2", "layer 3", "layer 4", "layer 5", "layer 6",
+        //             "layer 7",
+        //         ];
+        //         ui.checkbox("检查阴影贴图", &mut self.debug);
+        //         ui.combo_simple_string("Layer", &mut self.layer, &items);
+        //         ui.checkbox("视锥体显示", &mut self.debug_frustum)
+        //     });
     }
 }
 
@@ -278,6 +261,19 @@ impl UIHandle for World {
                     if ui.is_key_down(imgui::Key::LeftCtrl) {
                         camera.transform.position -= glam::f32::Vec3::Y * move_speed;
                     }
+                }
+
+                if camera.move_state == camera::MoveState::RigidBody {
+                    camera.set_dynamic();
+                    self.camera_force[0] = ui.is_key_down(imgui::Key::W);
+                    self.camera_force[1] = ui.is_key_down(imgui::Key::S);
+                    self.camera_force[2] = ui.is_key_down(imgui::Key::A);
+                    self.camera_force[3] = ui.is_key_down(imgui::Key::D);
+                    self.camera_force[4] = ui.is_key_down(imgui::Key::Space);
+                    self.camera_force[5] = ui.is_key_down(imgui::Key::LeftShift);
+                    camera.update_impluse(self.camera_force);
+                } else {
+                    camera.set_static();
                 }
             }
 

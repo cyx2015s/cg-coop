@@ -6,7 +6,7 @@ impl UIBuild for LightObject {
     fn build_ui(&mut self, ui: &imgui::Ui) {
         ui.window("灯光面板 (Inspector)")
             .size([250.0, 500.0], Condition::FirstUseEver)
-            .position([240.0, 150.0], Condition::FirstUseEver)
+            .position([700.0, 0.0], Condition::FirstUseEver)
             .build(|| {
                 ui.text_colored([0.0, 1.0, 0.0, 1.0], format!("当前选中: {}", self.name));
                 ui.separator();

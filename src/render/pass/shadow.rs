@@ -305,13 +305,7 @@ impl ShadowPass {
             }
             for cascade in 0..CASCADE_COUNT {
                 let layer = (light_index * CASCADE_COUNT + cascade) as u32;
-                self.render_layer(
-                    shadow_atlas,
-                    light_space_matrix,
-                    display,
-                    layer,
-                    scene,
-                );
+                self.render_layer(shadow_atlas, light_space_matrix, display, layer, scene);
             }
         }
     }

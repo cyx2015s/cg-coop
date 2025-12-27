@@ -59,7 +59,7 @@ impl SceneRenderer {
             glium::uniforms::UniformBuffer::new(display, light_matrix_block).unwrap();
 
         let light_block = LightBlock {
-            lights: [Light::new(); 32],
+            lights: [Light::NONE; 32],
             num_lights: 0,
         };
 

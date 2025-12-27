@@ -1,6 +1,8 @@
 use glam::f32::Vec3;
 use std::ops::Index;
 
+use crate::core::math::ray::Ray;
+
 #[derive(Debug, Clone, Copy)]
 pub struct AABB {
     pub min: Vec3,
@@ -18,33 +20,36 @@ impl AABB {
         Self { min, max }
     }
 
-    pub fn new_from_array(min: [f32; 3], max: [f32; 3]) -> Self {
-        Self::new(Vec3::from_array(min), Vec3::from_array(max))
+    pub fn new_from_array(_min_: [f32; 3], max: [f32; 3]) -> Self {
+        Self::new(Vec3::from_array(_min_), Vec3::from_array(max))
     }
 
-    // pub fn intersect(&self, ray: &Ray) -> bool{
-    //     let invDir = Vec3::new(1.0 / ray.d.x, 1.0 / ray.d.y, 1.0 / ray.d.z);
-    //     let sign = Vec3::new(if ray.d.x < 0.0 { 1 } else { 0 }, if ray.d.y < 0.0 { 1 } else { 0 }, if ray.d.z < 0.0 { 1 } else { 0 });
-    //     return self.intersect_full(ray, invDir, sign);
-    // }
+    pub fn intersect(&self, ray: &Ray) -> bool {
+        let inv_dir = Vec3::new(1.0 / ray.d.x, 1.0 / ray.d.y, 1.0 / ray.d.z);
+        let sign = glam::usize::USizeVec3::new(
+            if ray.d.x < 0.0 { 1 } else { 0 },
+            if ray.d.y < 0.0 { 1 } else { 0 },
+            if ray.d.z < 0.0 { 1 } else { 0 },
+        );
+        return self.intersect_full(ray, inv_dir, sign);
+    }
 
-    // pub fn intersect_full(&self, ray: &Ray, invDir: Vec3, sign: Vec3) -> bool{
-    //     let aabb = self;
-    //     let o = &ray.o;
-    //     let d = &ray.d;
+    pub fn intersect_full(&self, ray: &Ray, inv_dir: Vec3, sign: glam::usize::USizeVec3) -> bool {
+        let o = &ray.o;
+        let d = &ray.d;
 
-    //     f32 tMinX = (self[sign.x].x - o.x) * invDir.x;
-    //     f32 tMaxX = (self[1 - sign.x].x - o.x) * invDir.x;
-    //     f32 tMinY = (self[sign.y].y - o.y) * invDir.y;
-    //     f32 tMaxY = (self[1 - sign.y].y - o.y) * invDir.y;
-    //     f32 tMinZ = (self[sign.z].z - o.z) * invDir.z;
-    //     f32 tMaxZ = (self[1 - sign.z].z - o.z) * invDir.z;
+        let t_min_x = (self[sign.x].x - o.x) * inv_dir.x;
+        let t_max_x = (self[1 - sign.x].x - o.x) * inv_dir.x;
+        let t_min_y = (self[sign.y].y - o.y) * inv_dir.y;
+        let t_max_y = (self[1 - sign.y].y - o.y) * inv_dir.y;
+        let t_min_z = (self[sign.z].z - o.z) * inv_dir.z;
+        let t_max_z = (self[1 - sign.z].z - o.z) * inv_dir.z;
 
-    //     let tMin = tMinX.max(tMinY).max(tMinZ);
-    //     let tMax = tMaxX.min(tMaxY).min(tMaxZ);
+        let t_min = t_min_x.max(t_min_y).max(t_min_z);
+        let t_max_ = t_max_x.min(t_max_y).min(t_max_z);
 
-    //     return tMin < tMax && tMax > 0.0 && tMin < ray.tMax;
-    // }
+        return t_min < t_max_ && t_max_ > 0.0 && t_min < ray.t_max;
+    }
     pub fn get_half_extents(&self) -> Vec3 {
         (self.max - self.min) * 0.5
     }
@@ -76,7 +81,7 @@ impl AABB {
             ],
         );
 
-        global_aabb
+        return global_aabb;
     }
     pub fn union_point_array(&mut self, v: [f32; 3]) {
         self.min = self.min.min(glam::f32::Vec3::from_array(v));
@@ -111,11 +116,6 @@ pub fn union_aabb_point(a: &AABB, p: Vec3) -> AABB {
         min: Vec3::new(a.min.x.min(p.x), a.min.y.min(p.y), a.min.z.min(p.z)),
         max: Vec3::new(a.max.x.max(p.x), a.max.y.max(p.y), a.max.z.max(p.z)),
     }
-}
-
-pub fn union_aabb_point_inplace(dest: &mut AABB, p: Vec3) {
-    dest.min = dest.min.min(p);
-    dest.max = dest.max.max(p);
 }
 
 pub fn maximum_dim(a: &AABB) -> usize {
