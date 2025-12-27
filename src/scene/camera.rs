@@ -1,4 +1,9 @@
-use crate::core::math::transform;
+use std::f32;
+
+use crate::{
+    core::math::transform,
+    scene::world::{BodyType, PhysicalProperties},
+};
 
 pub enum MoveState {
     Locked,
@@ -21,12 +26,15 @@ impl PartialEq for MoveState {
 
 pub struct Camera {
     pub transform: transform::Transform,
+    pub physics: PhysicalProperties,
     pub fovy: f32,
     pub aspect: f32,
     pub znear: f32,
     pub zfar: f32,
     pub pitch: f32,
     pub yaw: f32,
+    pub force: f32,
+    pub up_velocity: f32,
 
     pub move_state: MoveState,
     pub pan_obit_speed: f32,
@@ -40,12 +48,15 @@ impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
             transform: transform::Transform::default(),
-            fovy: 3.141592 / 3.0,
+            physics: PhysicalProperties::default(),
+            fovy: f32::consts::PI / 3.0,
             aspect,
             znear: 0.1,
             zfar: 50.0,
             pitch: 0.0,
             yaw: 0.0,
+            force: 9.5,
+            up_velocity: 4.0,
 
             move_state: MoveState::Locked,
             pan_obit_speed: 1.0,
@@ -60,6 +71,7 @@ impl Camera {
         self.transform.position = [0.0, 0.0, 10.0].into();
         self.transform
             .look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
+        self.physics.friction = [8.0; 3];
         self.rotate(0.0, 0.0);
     }
 
@@ -75,6 +87,13 @@ impl Camera {
         self.transform.rotation = yaw_quat * pitch_quat * glam::f32::Quat::IDENTITY;
     }
 
+    pub fn set_dynamic(&mut self) {
+        self.physics.body_type = BodyType::Dynamic;
+    }
+
+    pub fn set_static(&mut self) {
+        self.physics.body_type = BodyType::Static;
+    }
     // 获取视图矩阵
     pub fn get_view_matrix(&self) -> [[f32; 4]; 4] {
         glam::f32::Mat4::look_to_rh(
@@ -125,6 +144,29 @@ impl Camera {
     pub fn get_projection_matrix(&self) -> [[f32; 4]; 4] {
         glam::f32::Mat4::perspective_rh_gl(self.fovy, self.aspect, self.znear, self.zfar)
             .to_cols_array_2d()
+    }
+
+    pub fn update_impluse(&mut self, flag: [bool; 6]) {
+        let forward_origin = self.transform.get_forward();
+        let forward = glam::f32::Vec3::new(forward_origin.x, 0.0, forward_origin.z).normalize();
+        let up = glam::f32::Vec3::Y;
+        let right = up.cross(forward).normalize();
+        let mut f_force = forward * self.force;
+        let mut r_force = right * self.force;
+        if flag[0] != flag[1] && !flag[0] {
+            f_force *= -1.0;
+        } else if flag[0] == flag[1] {
+            f_force *= 0.0;
+        }
+        if flag[2] != flag[3] && !flag[2] {
+            r_force *= -1.0;
+        } else if flag[2] == flag[3] {
+            r_force *= 0.0;
+        }
+        if flag[4] && self.physics.velocity[1].abs() < 0.01 {
+            self.physics.velocity[1] = self.up_velocity;
+        }
+        self.physics.force = (f_force + r_force).to_array();
     }
 }
 

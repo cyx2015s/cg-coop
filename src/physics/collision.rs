@@ -1,8 +1,6 @@
-use crate::{
-    core::math::aabb::AABB,
-    scene::world::{BodyType, GameObject},
-};
+use crate::{core::math::aabb::AABB, physics::rigid::RigidBody};
 
+// 检测两个AABB是否相交
 pub fn aabb_intersect(a: &AABB, b: &AABB) -> bool {
     a.min.x <= b.max.x
         && a.max.x >= b.min.x
@@ -12,36 +10,45 @@ pub fn aabb_intersect(a: &AABB, b: &AABB) -> bool {
         && a.max.z >= b.min.z
 }
 
-pub fn apply_gravity(obj: &mut GameObject, gravity: glam::f32::Vec3, dt: f32) {
-    if obj.physics.body_type == BodyType::Dynamic {
-        obj.physics.velocity[1] += gravity.y * dt;
+// 对特定物体应用重力
+pub fn apply_gravity(obj: &mut dyn RigidBody, gravity: glam::f32::Vec3, dt: f32) {
+    if obj.is_dynamic() {
+        obj.velocity_mut()[1] += gravity.y * dt;
     }
 }
 
-pub fn predict_position(obj: &GameObject, dt: f32) -> glam::f32::Vec3 {
-    let pos = obj.transform.position;
-    let vel = glam::f32::Vec3::from_array(obj.physics.velocity);
+// 预测物体下一帧的位置
+pub fn predict_position(obj: &dyn RigidBody, dt: f32) -> glam::f32::Vec3 {
+    let pos = obj.transform().position;
+    let vel = glam::f32::Vec3::from_array(obj.velocity());
     pos + vel * dt
 }
 
-pub fn resolve_collision(
-    dynamic_body: &mut GameObject,
-    static_body_aabb: &AABB,
-    predicted_pos: glam::f32::Vec3,
-) -> bool {
-    let half_size = dynamic_body.mesh.aabb.get_half_extents();
-    let dynamic_aabb = AABB {
-        min: predicted_pos - half_size,
-        max: predicted_pos + half_size,
+// 解决碰撞：目前只有y轴的碰撞
+pub fn resolve_collision(a: &mut dyn RigidBody, b: &mut dyn RigidBody, dt: f32) -> bool {
+    if b.is_dynamic() {
+        return false;
+    }
+    let half_size_a = a.aabb().get_half_extents();
+    let predicted_pos_a = predict_position(a, dt);
+    let half_size_b = b.aabb().get_half_extents();
+    let predicted_pos_b = predict_position(b, dt);
+    let a_aabb = AABB {
+        min: predicted_pos_a - half_size_a,
+        max: predicted_pos_a + half_size_a,
     };
 
-    if aabb_intersect(&dynamic_aabb, static_body_aabb) {
-        let penetration = static_body_aabb.max.y - dynamic_aabb.min.y;
-        dynamic_body.transform.position.y += penetration;
-        dynamic_body.physics.velocity[1] =
-            -dynamic_body.physics.velocity[1] * dynamic_body.physics.restitution;
-        if dynamic_body.physics.velocity[1].abs() < 0.1 {
-            dynamic_body.physics.velocity[1] = 0.0;
+    let b_aabb = AABB {
+        min: predicted_pos_b - half_size_b,
+        max: predicted_pos_b + half_size_b,
+    };
+
+    if aabb_intersect(&a_aabb, &b_aabb) {
+        let penetration = b_aabb.max.y - a_aabb.min.y;
+        a.transform_mut().position.y += penetration;
+        a.velocity_mut()[1] = -a.velocity_mut()[1] * a.restitution();
+        if a.velocity()[1].abs() < 0.1 {
+            a.velocity_mut()[1] = 0.0;
         }
         return true;
     }

@@ -1,7 +1,6 @@
 use glium::Program;
 use glutin::surface::WindowSurface;
 
-
 use crate::render::shader::create_program;
 use crate::scene::world::World;
 
