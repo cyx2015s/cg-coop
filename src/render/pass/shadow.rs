@@ -357,7 +357,7 @@ impl ShadowPass {
         
         // 渲染所有网格
         for obj in &scene.objects {
-            if !obj.visible { continue; }
+            if !obj.rendering.visible { continue; }
 
             let vertices: Vec<Vertex> = obj.mesh.vertices.iter()
                 .zip(obj.mesh.tex_coords.iter())

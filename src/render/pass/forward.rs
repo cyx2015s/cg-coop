@@ -150,10 +150,10 @@ impl ForwardPass{
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
 
             for obj in &world.objects {
-                if !obj.visible { continue; }
+                if !obj.rendering.visible { continue; }
 
                 let model = obj.transform.get_matrix().to_cols_array_2d();
-                let m_block = material::MaterialBlock { material: obj.material };
+                let m_block = material::MaterialBlock { material: obj.rendering.material };
                 self.material_ubo.write(&m_block);
 
                 let count = obj.mesh.vertices.len();
@@ -203,7 +203,7 @@ impl ForwardPass{
                         Material_Block: &self.material_ubo,
                         Light_Block: &self.light_block_ubo,
                         diffuse_tex: use_tex, 
-                        has_texture: obj.use_texture,
+                        has_texture: obj.rendering.use_texture,
                         // 传入阴影参数
                         LightSpaceMatrix_Block: &self.light_space_matrix_ubo,
                         shadow_map: shadow_sampler,

@@ -1,5 +1,10 @@
 use crate::core::math::ray;
+use crate::geometry::shape::cone::Cone;
+use crate::geometry::shape::cube::Cube;
+use crate::geometry::shape::cylinder::Cylinder;
 use crate::geometry::shape::mesh::Mesh;
+use crate::geometry::shape::nurbs::NurbsSurface;
+use crate::geometry::shape::sphere::Sphere;
 use crate::scene::camera;
 use crate::scene::world::{GameObject, ShapeKind, World};
 use crate::ui::{UIBuild, UIHandle};
@@ -66,11 +71,11 @@ impl UIBuild for World {
                 if ui.button("立方体") {
                     self.add_object(GameObject::new(
                         "Cube",
-                        ShapeKind::Cube {
+                        Box::new(Cube {
                             width: 1.0,
                             height: 1.0,
                             depth: 1.0,
-                        },
+                        }),
                         self.default_mat,
                     ));
                 }
@@ -78,10 +83,11 @@ impl UIBuild for World {
                 if ui.button("球体") {
                     self.add_object(GameObject::new(
                         "Sphere",
-                        ShapeKind::Sphere {
+                        Box::new(Sphere {
                             radius: 0.5,
-                            sectors: 32,
-                        },
+                            col_divisions: 32,
+                            row_divisions: 32,
+                        }),
                         self.default_mat,
                     ));
                 }
@@ -90,35 +96,35 @@ impl UIBuild for World {
                 if ui.button("圆柱") {
                     self.add_object(GameObject::new(
                         "Cylinder",
-                        ShapeKind::Cylinder {
+                        Box::new(Cylinder {
                             top_radius: 0.5,
                             bottom_radius: 0.5,
                             height: 1.0,
                             sectors: 32,
-                        },
+                        }),
                         self.default_mat,
                     ));
                 }
                 if ui.button("棱台") {
                     self.add_object(GameObject::new(
                         "Frustum",
-                        ShapeKind::Cylinder {
+                        Box::new(Cylinder {
                             top_radius: 0.3,
                             bottom_radius: 0.8,
                             height: 1.0,
                             sectors: 32,
-                        },
+                        }),
                         self.default_mat,
                     ));
                 }
                 if ui.button("圆锥") {
                     self.add_object(GameObject::new(
                         "Cone",
-                        ShapeKind::Cone {
+                        Box::new(Cone {
                             radius: 0.5,
                             height: 1.0,
                             sectors: 32,
-                        },
+                        }),
                         self.default_mat,
                     ));
                 }
@@ -147,22 +153,22 @@ impl UIBuild for World {
                     let weights = vec![1.0; 16];
                     self.add_object(GameObject::new(
                         "Nurbs Surface",
-                        ShapeKind::Nurbs {
+                        Box::new(NurbsSurface {
                             degree: 3,
                             control_points: pts,
-                            weights,
+                            weights: weights,
                             u_count: 4,
                             v_count: 4,
-                            current_nurbs_idx: 0,
-                        },
+                            splits: 32,
+                            selected_point_idx: None,
+                        }),
                         self.default_mat,
                     ));
                 }
                 if ui.button("导入模型") {
                     if let Ok(mesh) = Mesh::load_obj("output.obj") {
                         let mut obj =
-                            GameObject::new("Imported", ShapeKind::Imported, self.default_mat);
-                        obj.mesh = mesh;
+                            GameObject::new("Imported", Box::new(mesh), self.default_mat);
                         self.add_object(obj);
                     }
                 }
@@ -306,13 +312,24 @@ impl UIHandle for World {
                 }
                 if ui.is_key_pressed(imgui::Key::P) {
                     let now = SystemTime::now();
-                    let duration = now.duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards");
+                    let duration = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
                     let timestamp = duration.as_secs();
-                    let image: glium::texture::RawImage2d<'_, u8> = display.read_front_buffer().unwrap();
-                    let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
+                    let image: glium::texture::RawImage2d<'_, u8> =
+                        display.read_front_buffer().unwrap();
+                    let image = image::ImageBuffer::from_raw(
+                        image.width,
+                        image.height,
+                        image.data.into_owned(),
+                    )
+                    .unwrap();
                     let image = image::DynamicImage::ImageRgba8(image).flipv();
-                    image.save("/saved/screenshot/screenshot_".to_owned() + &timestamp.to_string() +".png").unwrap();
+                    image
+                        .save(
+                            "/saved/screenshot/screenshot_".to_owned()
+                                + &timestamp.to_string()
+                                + ".png",
+                        )
+                        .unwrap();
                 }
             }
 
@@ -336,7 +353,6 @@ impl UIHandle for World {
                 let world_near = world_near.truncate() / world_near.w;
                 mouse_click_far = Some(world_far);
                 mouse_click_near = Some(world_near);
-
             }
 
             if camera.move_state == camera::MoveState::PanObit {
@@ -345,47 +361,46 @@ impl UIHandle for World {
         }
 
         // 顶点选择
-        if let (Some(mouse_click_near), Some(mouse_click_far)) =
-            (mouse_click_near, mouse_click_far)
-        {
-            if let Some(game_obj) = self.get_selected_mut() {
-                if game_obj.kind == ShapeKind::Imported {
-                    let inv_model = game_obj.transform.get_matrix().inverse();
-                    let local_mouse_click_near = inv_model * mouse_click_near.extend(1.0);
-                    let local_mouse_click_far = inv_model * mouse_click_far.extend(1.0);
-                    let local_ray_o = local_mouse_click_near.truncate();
-                    let local_ray_d = (local_mouse_click_far.truncate() - local_ray_o).normalize();
-                    let camera_ray = ray::Ray {
-                        o: local_ray_o,
-                        d: local_ray_d,
-                        t_max: f32::INFINITY,
-                    };
-                    match game_obj
-                        .mesh
-                        .compute_closest_point(camera_ray.o.to_array(), camera_ray.d.to_array())
-                    {
-                        Some((pt, cos_angle)) => {
-                            // 找到最近点，标记选中
-                            if cos_angle < 0.99 {
-                                game_obj.selected_vertex_index = None;
-                                return;
-                            }
-                            for (i, v) in game_obj.mesh.vertices.iter().enumerate() {
-                                let v_pos = glam::Vec3::from(*v);
-                                if (v_pos - glam::Vec3::from(pt)).length() < 0.1 {
-                                    game_obj.selected_vertex_index = Some(i);
-                                    println!("selected point: {:?}", pt);
-                                    break;
-                                }
-                            }
-                        }
-                        None => {
-                            game_obj.selected_vertex_index = None;
-                            println!("no point found");
-                        }
-                    }
-                }
-            }
-        }
+        // if let (Some(mouse_click_near), Some(mouse_click_far)) = (mouse_click_near, mouse_click_far)
+        // {
+        //     if let Some(game_obj) = self.get_selected_mut() {
+        //         if game_obj.kind == ShapeKind::Imported {
+        //             let inv_model = game_obj.transform.get_matrix().inverse();
+        //             let local_mouse_click_near = inv_model * mouse_click_near.extend(1.0);
+        //             let local_mouse_click_far = inv_model * mouse_click_far.extend(1.0);
+        //             let local_ray_o = local_mouse_click_near.truncate();
+        //             let local_ray_d = (local_mouse_click_far.truncate() - local_ray_o).normalize();
+        //             let camera_ray = ray::Ray {
+        //                 o: local_ray_o,
+        //                 d: local_ray_d,
+        //                 t_max: f32::INFINITY,
+        //             };
+        //             match game_obj
+        //                 .mesh
+        //                 .compute_closest_point(camera_ray.o.to_array(), camera_ray.d.to_array())
+        //             {
+        //                 Some((pt, cos_angle)) => {
+        //                     // 找到最近点，标记选中
+        //                     if cos_angle < 0.99 {
+        //                         game_obj.selected_vertex_index = None;
+        //                         return;
+        //                     }
+        //                     for (i, v) in game_obj.mesh.vertices.iter().enumerate() {
+        //                         let v_pos = glam::Vec3::from(*v);
+        //                         if (v_pos - glam::Vec3::from(pt)).length() < 0.1 {
+        //                             game_obj.selected_vertex_index = Some(i);
+        //                             println!("selected point: {:?}", pt);
+        //                             break;
+        //                         }
+        //                     }
+        //                 }
+        //                 None => {
+        //                     game_obj.selected_vertex_index = None;
+        //                     println!("no point found");
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

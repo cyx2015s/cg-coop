@@ -7,14 +7,14 @@ pub fn aabb_intersect(a: &AABB, b: &AABB) -> bool {
 }
 
 pub fn apply_gravity(obj: &mut GameObject, gravity: glam::f32::Vec3, dt: f32) {
-    if obj.body_type == BodyType::Dynamic { 
-        obj.velocity[1] += gravity.y * dt;
+    if obj.physics.body_type == BodyType::Dynamic { 
+        obj.physics.velocity[1] += gravity.y * dt;
     }
 }
 
 pub fn predict_position(obj: &GameObject, dt: f32) -> glam::f32::Vec3 {
     let pos = obj.transform.position;
-    let vel = glam::f32::Vec3::from_array(obj.velocity);
+    let vel = glam::f32::Vec3::from_array(obj.physics.velocity);
     pos + vel * dt
 }
 
@@ -28,9 +28,9 @@ pub fn resolve_collision(dynamic_body: &mut GameObject, static_body_aabb: &AABB,
     if aabb_intersect(&dynamic_aabb, &static_body_aabb) {
         let penetration = static_body_aabb.max.y - dynamic_aabb.min.y;
         dynamic_body.transform.position.y += penetration;
-        dynamic_body.velocity[1] = -dynamic_body.velocity[1] * dynamic_body.restitution;
-        if dynamic_body.velocity[1].abs() < 0.1 {
-            dynamic_body.velocity[1] = 0.0;
+        dynamic_body.physics.velocity[1] = -dynamic_body.physics.velocity[1] * dynamic_body.physics.restitution;
+        if dynamic_body.physics.velocity[1].abs() < 0.1 {
+            dynamic_body.physics.velocity[1] = 0.0;
         }
         return true;
     }

@@ -17,6 +17,12 @@ pub trait AsMesh {
     fn as_mesh(&self) -> Mesh;
 }
 
+impl AsMesh for Mesh {
+    fn as_mesh(&self) -> Mesh {
+        self.clone()
+    }
+}
+
 impl Mesh {
     /// 导出为 OBJ 文件
     pub fn save_obj<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {

@@ -34,6 +34,7 @@ pub struct NurbsSurface {
     pub v_count: usize,
     pub degree: usize,
     pub splits: usize,
+    pub selected_point_idx: Option<usize>,
 }
 
 impl AsMesh for NurbsSurface {

@@ -1,23 +1,22 @@
-use super::light::{ SpotLight, AmbientLight, Light, DirectionalLight, PointLight};
-use super::camera::{ Camera, MouseState };
+use super::camera::{Camera, MouseState};
+use super::light::{AmbientLight, DirectionalLight, Light, PointLight, SpotLight};
 
-use crate::core::math::transform::Transform;
-use crate::core::material::{ Material, Phong };
+use crate::core::material::{Material, Phong};
 use crate::core::math::aabb::AABB;
-use crate::geometry::shape::mesh::{ AsMesh, Mesh};
+use crate::core::math::transform::Transform;
+use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
 use crate::physics::collision::{apply_gravity, predict_position, resolve_collision};
 
-use std::time::Instant;
 use glutin::surface::WindowSurface;
+use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BodyType {
-    Static,   // 固定物体
-    Dynamic,  // 自由物体
+    Static,  // 固定物体
+    Dynamic, // 自由物体
 }
-
 
 #[derive(Clone, PartialEq)]
 pub enum ShapeKind {
@@ -52,18 +51,34 @@ pub enum ShapeKind {
     },
 }
 
-pub struct GameObject {
-    pub name: String,
-    pub transform: Transform,
+pub struct PhysicalProperties {
     pub velocity: [f32; 3],
-    pub material: Material,
     pub body_type: BodyType,
     pub restitution: f32,
-    pub mesh: Mesh,
-    pub kind: ShapeKind,
+}
+
+pub struct RenderProperties {
+    pub material: Material,
     pub visible: bool,
     pub use_texture: bool,
     pub selected_vertex_index: Option<usize>,
+}
+
+pub trait EditableMesh: AsMesh {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        false
+    }
+}
+
+impl<T> EditableMesh for T where T: AsMesh {}
+
+pub struct GameObject {
+    pub name: String,
+    pub shape: Box<dyn EditableMesh>,
+    pub mesh: Mesh, // cache of as_mesh
+    pub rendering: RenderProperties,
+    pub transform: Transform,
+    pub physics: PhysicalProperties,
 }
 
 pub struct LightObject {
@@ -76,14 +91,12 @@ pub struct CameraObject {
     pub camera: Camera,
 }
 
-
-
 impl GameObject {
-    pub fn new(name: &str, kind: ShapeKind, material: Material) -> Self {
+    pub fn new(name: &str, shape: Box<dyn EditableMesh>, material: Material) -> Self {
         let mut obj = Self {
             name: name.to_string(),
             transform: Transform::default(),
-            material,
+            shape,
             mesh: Mesh {
                 vertices: vec![],
                 normals: vec![],
@@ -91,13 +104,17 @@ impl GameObject {
                 indices: vec![],
                 aabb: AABB::default(),
             },
-            velocity: [0.0, 0.0, 0.0],
-            kind,
-            body_type: BodyType::Static,
-            restitution: 0.0,   
-            visible: true,
-            use_texture: false,
-            selected_vertex_index: None,
+            physics: PhysicalProperties {
+                velocity: [0.0, 0.0, 0.0],
+                body_type: BodyType::Static,
+                restitution: 0.0,
+            },
+            rendering: RenderProperties {
+                material,
+                visible: true,
+                use_texture: false,
+                selected_vertex_index: None,
+            },
         };
         obj.regenerate_mesh();
         obj
@@ -112,83 +129,83 @@ impl GameObject {
     }
 
     pub fn set_body_type(&mut self, new_type: BodyType) {
-        if self.body_type == new_type {
+        if self.physics.body_type == new_type {
             return;
         }
-        self.velocity = [0.0, 0.0, 0.0];
-        self.body_type = new_type;
+        self.physics.velocity = [0.0, 0.0, 0.0];
+        self.physics.body_type = new_type;
     }
     pub fn regenerate_mesh(&mut self) {
-        self.mesh = match &self.kind {
-            ShapeKind::Cube {
-                width,
-                height,
-                depth,
-            } => {
-                let s = Cube {
-                    width: *width,
-                    height: *height,
-                    depth: *depth,
-                };
-                s.as_mesh()
-            }
-            ShapeKind::Sphere { radius, sectors } => {
-                let s = Sphere {
-                    radius: *radius,
-                    col_divisions: *sectors,
-                    row_divisions: *sectors,
-                };
-                s.as_mesh()
-            }
-            ShapeKind::Cylinder {
-                top_radius,
-                bottom_radius,
-                height,
-                sectors,
-            } => {
-                let s = Cylinder {
-                    bottom_radius: *bottom_radius,
-                    top_radius: *top_radius,
-                    height: *height,
-                    sectors: *sectors,
-                };
-                s.as_mesh()
-            }
-            ShapeKind::Cone {
-                radius,
-                height,
-                sectors,
-            } => {
-                let s = Cone {
-                    radius: *radius,
-                    height: *height,
-                    sectors: *sectors,
-                };
-                s.as_mesh()
-            }
-            ShapeKind::Imported => self.mesh.clone(),
-            ShapeKind::Nurbs {
-                degree,
-                control_points,
-                weights,
-                u_count,
-                v_count,
-                current_nurbs_idx: _,
-            } => {
-                let s = NurbsSurface {
-                    control_points: control_points.clone(),
-                    weights: weights.clone(),
-                    u_count: *u_count,
-                    v_count: *v_count,
-                    degree: *degree,
-                    splits: 32,
-                };
-                s.as_mesh()
-            }
-        };
+        self.mesh = self.shape.as_mesh();
+        // self.mesh = match &self.kind {
+        //     ShapeKind::Cube {
+        //         width,
+        //         height,
+        //         depth,
+        //     } => {
+        //         let s = Cube {
+        //             width: *width,
+        //             height: *height,
+        //             depth: *depth,
+        //         };
+        //         s.as_mesh()
+        //     }
+        //     ShapeKind::Sphere { radius, sectors } => {
+        //         let s = Sphere {
+        //             radius: *radius,
+        //             col_divisions: *sectors,
+        //             row_divisions: *sectors,
+        //         };
+        //         s.as_mesh()
+        //     }
+        //     ShapeKind::Cylinder {
+        //         top_radius,
+        //         bottom_radius,
+        //         height,
+        //         sectors,
+        //     } => {
+        //         let s = Cylinder {
+        //             bottom_radius: *bottom_radius,
+        //             top_radius: *top_radius,
+        //             height: *height,
+        //             sectors: *sectors,
+        //         };
+        //         s.as_mesh()
+        //     }
+        //     ShapeKind::Cone {
+        //         radius,
+        //         height,
+        //         sectors,
+        //     } => {
+        //         let s = Cone {
+        //             radius: *radius,
+        //             height: *height,
+        //             sectors: *sectors,
+        //         };
+        //         s.as_mesh()
+        //     }
+        //     ShapeKind::Imported => self.mesh.clone(),
+        //     ShapeKind::Nurbs {
+        //         degree,
+        //         control_points,
+        //         weights,
+        //         u_count,
+        //         v_count,
+        //         current_nurbs_idx: _,
+        //     } => {
+        //         let s = NurbsSurface {
+        //             control_points: control_points.clone(),
+        //             weights: weights.clone(),
+        //             u_count: *u_count,
+        //             v_count: *v_count,
+        //             degree: *degree,
+        //             splits: 32,
+        //         };
+        //         s.as_mesh()
+        //     }
+        // };
     }
 }
-
 
 pub struct World {
     pub last_frame_time: Instant,
@@ -219,7 +236,8 @@ impl World {
             selected_camera: None,
             mouse_state: MouseState::default(),
             default_aspect: 16.0 / 9.0,
-            default_mat: Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_material(),
+            default_mat: Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0)
+                .to_material(),
             debug: false,
             debug_frustum: false,
             layer: 0,
@@ -228,59 +246,65 @@ impl World {
     }
 
     pub fn step(&mut self, dt: f32) {
-        
         for i in 0..self.objects.len() {
-            if self.objects[i].body_type != BodyType::Dynamic { continue; }
-            apply_gravity(&mut self.objects[i], glam::f32::Vec3::from_array(self.gravity), dt);
+            if self.objects[i].physics.body_type != BodyType::Dynamic {
+                continue;
+            }
+            apply_gravity(
+                &mut self.objects[i],
+                glam::f32::Vec3::from_array(self.gravity),
+                dt,
+            );
 
             let predicted_pos = predict_position(&self.objects[i], dt);
 
             let mut collided = false;
             for j in 0..self.objects.len() {
-                if self.objects[j].body_type == BodyType::Static {
+                if self.objects[j].physics.body_type == BodyType::Static {
                     let static_aabb = self.objects[j].aabb();
-                    if resolve_collision(
-                        &mut self.objects[i],
-                        &static_aabb,
-                        predicted_pos) {
-                            collided = true;
-                            break;
-                        }
+                    if resolve_collision(&mut self.objects[i], &static_aabb, predicted_pos) {
+                        collided = true;
+                        break;
+                    }
                 }
             }
             if !collided {
                 self.objects[i].transform.position = predicted_pos;
             }
         }
-
     }
 
-    pub fn handle_mouse_move(&mut self, delta: (f64, f64), window: &glium::winit::window::Window){
+    pub fn handle_mouse_move(&mut self, delta: (f64, f64), window: &glium::winit::window::Window) {
         if let Some(idx) = self.get_selected_camera() {
             let mouse_state = &mut self.mouse_state;
             let camera = &mut self.cameras[idx].camera;
-            if camera.move_state == crate::scene::camera::MoveState::Free && !mouse_state.is_locked() {
+            if camera.move_state == crate::scene::camera::MoveState::Free
+                && !mouse_state.is_locked()
+            {
                 mouse_state.toggle_lock(window);
-            } else if mouse_state.is_locked() && camera.move_state != crate::scene::camera::MoveState::Free {
+            } else if mouse_state.is_locked()
+                && camera.move_state != crate::scene::camera::MoveState::Free
+            {
                 mouse_state.toggle_lock(window);
             }
             mouse_state.handle_mouse_move(delta, camera, window);
         }
     }
-    pub fn init_scene_1(&mut self,display: &glium::Display<WindowSurface>) {
+    pub fn init_scene_1(&mut self, display: &glium::Display<WindowSurface>) {
         let (width, height) = display.get_framebuffer_dimensions();
-        let aspect = width as f32 / height as f32;  
+        let aspect = width as f32 / height as f32;
         self.default_aspect = aspect;
         self.new_ambient_light("环境光", 0.1, [1.0, 1.0, 1.0]);
-        self.new_camera("相机",aspect);
-        let default_mat = Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_material();
+        self.new_camera("相机", aspect);
+        let default_mat =
+            Phong::new([1.0, 0.5, 0.31], [1.0, 0.5, 0.31], [0.5, 0.5, 0.5], 32.0).to_material();
         let mut floor = GameObject::new(
             "Floor",
-            ShapeKind::Cube {
+            Box::new(Cube {
                 width: 10.0,
                 height: 0.1,
                 depth: 10.0,
-            },
+            }),
             default_mat,
         );
         floor.transform.position.y = -1.0;
@@ -288,10 +312,11 @@ impl World {
 
         let sphere = GameObject::new(
             "Sphere",
-            ShapeKind::Sphere {
+            Box::new(Sphere {
                 radius: 0.8,
-                sectors: 32,
-            },
+                col_divisions: 32,
+                row_divisions: 32,
+            }),
             default_mat,
         );
         self.add_object(sphere);
@@ -318,14 +343,18 @@ impl World {
     pub fn new_ambient_light(&mut self, name: &str, intensity: f32, color: [f32; 3]) {
         let light = LightObject {
             name: name.to_string(),
-            light: AmbientLight {
-                intensity,
-                color,
-            }.to_light(),
+            light: AmbientLight { intensity, color }.to_light(),
         };
         self.add_light(light);
     }
-    pub fn new_directional_light(&mut self, name: &str, position: [f32; 3], direction: [f32; 3], intensity: f32, color: [f32; 3]) {
+    pub fn new_directional_light(
+        &mut self,
+        name: &str,
+        position: [f32; 3],
+        direction: [f32; 3],
+        intensity: f32,
+        color: [f32; 3],
+    ) {
         let light = LightObject {
             name: name.to_string(),
             light: DirectionalLight {
@@ -333,47 +362,66 @@ impl World {
                 direction,
                 intensity,
                 color,
-            }.to_light(),
+            }
+            .to_light(),
         };
         self.add_light(light);
     }
-    pub fn new_point_light(&mut self, name: &str, 
-        position: [f32; 3], intensity: f32, color: [f32; 3], 
-        kc: f32, kl: f32, kq: f32) {
-            let light = LightObject {
-                name: name.to_string(),
-                light: PointLight {
-                    position,
-                    intensity,
-                    color,
-                    kc,
-                    kl,
-                    kq,
-                }.to_light(),
-            };
-            self.add_light(light);
-        }
+    pub fn new_point_light(
+        &mut self,
+        name: &str,
+        position: [f32; 3],
+        intensity: f32,
+        color: [f32; 3],
+        kc: f32,
+        kl: f32,
+        kq: f32,
+    ) {
+        let light = LightObject {
+            name: name.to_string(),
+            light: PointLight {
+                position,
+                intensity,
+                color,
+                kc,
+                kl,
+                kq,
+            }
+            .to_light(),
+        };
+        self.add_light(light);
+    }
 
-    pub fn new_spot_light(&mut self, name: &str, 
-        position: [f32; 3], direction: [f32; 3], intensity: f32, color: [f32; 3], 
-        kc: f32, kl: f32, kq: f32, angle: f32) {
-            let light = LightObject {
-                name: name.to_string(),
-                light: SpotLight {
-                    position,
-                    direction,
-                    intensity,
-                    color,
-                    kc,
-                    kl,
-                    kq,
-                    angle,
-                }.to_light(),
-            };
-            self.add_light(light);
-        }
+    pub fn new_spot_light(
+        &mut self,
+        name: &str,
+        position: [f32; 3],
+        direction: [f32; 3],
+        intensity: f32,
+        color: [f32; 3],
+        kc: f32,
+        kl: f32,
+        kq: f32,
+        angle: f32,
+    ) {
+        let light = LightObject {
+            name: name.to_string(),
+            light: SpotLight {
+                position,
+                direction,
+                intensity,
+                color,
+                kc,
+                kl,
+                kq,
+                angle,
+            }
+            .to_light(),
+        };
+        self.add_light(light);
+    }
 
-    pub fn add_camera(&mut self, camera: CameraObject){ 
+    pub fn add_camera(&mut self, camera: CameraObject) {
         self.cameras.push(camera);
         self.selected_camera = Some(self.cameras.len() - 1);
     }
@@ -387,7 +435,7 @@ impl World {
         None
     }
 
-    pub fn add_light(&mut self, light: LightObject){
+    pub fn add_light(&mut self, light: LightObject) {
         self.lights.push(light);
         self.selected_light = Some(self.lights.len() - 1);
     }
@@ -414,4 +462,3 @@ impl World {
         None
     }
 }
-
