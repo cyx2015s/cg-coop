@@ -1,5 +1,8 @@
-use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use imgui::Drag;
+
 use crate::core::math::aabb::AABB;
+use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use crate::scene::world::EditableMesh;
 use std::f32::consts::PI;
 
 pub struct Cylinder {
@@ -11,7 +14,10 @@ pub struct Cylinder {
 
 impl AsMesh for Cylinder {
     fn as_mesh(&self) -> Mesh {
-        let aabb = AABB::new_from_array([-self.bottom_radius, -self.height / 2.0, -self.bottom_radius], [self.bottom_radius, self.height / 2.0, self.bottom_radius]);
+        let aabb = AABB::new_from_array(
+            [-self.bottom_radius, -self.height / 2.0, -self.bottom_radius],
+            [self.bottom_radius, self.height / 2.0, self.bottom_radius],
+        );
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut tex_coords = Vec::new();
@@ -112,5 +118,21 @@ impl AsMesh for Cylinder {
             indices,
             aabb,
         }
+    }
+}
+
+impl EditableMesh for Cylinder {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        let mut changed = false;
+        ui.text("柱体参数");
+        changed |= Drag::new("顶半径")
+            .speed(0.05)
+            .build(ui, &mut self.top_radius);
+        changed |= Drag::new("底半径")
+            .speed(0.05)
+            .build(ui, &mut self.bottom_radius);
+        changed |= Drag::new("高度").speed(0.1).build(ui, &mut self.height);
+        changed |= Drag::new("精度").speed(1.0).build(ui, &mut self.sectors);
+        changed
     }
 }

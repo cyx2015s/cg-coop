@@ -160,7 +160,7 @@ impl UIBuild for World {
                             u_count: 4,
                             v_count: 4,
                             splits: 32,
-                            selected_point_idx: None,
+                            selected_point_idx: 0,
                         }),
                         self.default_mat,
                     ));

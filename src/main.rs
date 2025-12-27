@@ -16,6 +16,7 @@ fn main() {
 
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
     .with_title("Project - Mini Blender Mode")
+    .with_inner_size(1200, 900)
     .build(&event_loop);
 
     let mut global_ctx = cg_coop::ui::ctx::GlobalContext::new(&display, &window);

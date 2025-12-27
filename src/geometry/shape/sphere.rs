@@ -1,6 +1,9 @@
+use imgui::Drag;
+
 use crate::geometry::shape::mesh;
 use crate::geometry::shape::mesh::AsMesh;
 use crate::core::math::aabb::AABB;
+use crate::scene::world::EditableMesh;
 pub struct Sphere {
     pub radius: f32,
     pub col_divisions: u16,
@@ -59,5 +62,16 @@ impl AsMesh for Sphere {
             indices,
             aabb,
         }
+    }
+}
+
+impl EditableMesh for Sphere {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        let mut changed = false;
+        ui.text("球体参数");
+        changed |= Drag::new("半径").speed(0.1).build(ui, &mut self.radius);
+        changed |= Drag::new("列划分数").speed(1.0).build(ui, &mut self.col_divisions);
+        changed |= Drag::new("行划分数").speed(1.0).build(ui, &mut self.row_divisions);
+        changed
     }
 }

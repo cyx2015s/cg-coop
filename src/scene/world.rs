@@ -65,12 +65,15 @@ pub struct RenderProperties {
 }
 
 pub trait EditableMesh: AsMesh {
+    /// 返回值：是否需要重新生成网格
     fn ui(&mut self, ui: &imgui::Ui) -> bool {
         false
     }
+    /// 物体渲染分为两步，基础的和调试的
+    fn debug_ui(&mut self, _ui: &imgui::Ui) {
+        
+    }
 }
-
-impl<T> EditableMesh for T where T: AsMesh {}
 
 pub struct GameObject {
     pub name: String,

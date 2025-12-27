@@ -1,5 +1,8 @@
+use imgui::Drag;
+
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::core::math::aabb::AABB;
+use crate::scene::world::EditableMesh;
 pub struct Cube {
     pub width: f32,
     pub height: f32,
@@ -122,5 +125,16 @@ impl AsMesh for Cube {
             indices,
             aabb,
         }
+    }
+}
+
+impl EditableMesh for Cube {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        let mut changed = false;
+        ui.text("立方体参数");
+        changed |= Drag::new("宽度").speed(0.1).build(ui, &mut self.width);
+        changed |= Drag::new("高度").speed(0.1).build(ui, &mut self.height);
+        changed |= Drag::new("深度").speed(0.1).build(ui, &mut self.depth);
+        changed
     }
 }

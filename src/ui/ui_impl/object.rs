@@ -18,9 +18,8 @@ impl UIBuild for GameObject {
                 if ui.button("重置旋转") { self.transform.rotation = glam::f32::Quat::IDENTITY; }
 
                 ui.separator();
-                ui.text("形状参数 (Parameters)");
                 
-                let mut need_regen = self.shape.ui(ui);
+                let need_regen = self.shape.ui(ui);
                 // match &mut self.kind {
                 //     ShapeKind::Cube { width, height, depth } => {
                 //         if Drag::new("宽").speed(0.1).build(ui, width) { need_regen = true; }

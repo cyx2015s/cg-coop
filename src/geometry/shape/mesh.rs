@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::core::math::aabb::AABB;
+use crate::scene::world::EditableMesh;
 
 #[derive(Debug, Clone)]
 pub struct Mesh {
@@ -20,6 +21,13 @@ pub trait AsMesh {
 impl AsMesh for Mesh {
     fn as_mesh(&self) -> Mesh {
         self.clone()
+    }
+}
+
+impl EditableMesh for Mesh {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        ui.text("网格模型编辑能力受限。请在外部 3D 软件中修改后重新导入。");
+        false
     }
 }
 

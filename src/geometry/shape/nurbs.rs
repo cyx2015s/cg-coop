@@ -1,5 +1,8 @@
-use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use imgui::Drag;
+
 use crate::core::math::aabb::AABB;
+use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use crate::scene::world::EditableMesh;
 // 简单的 B-Spline 基函数计算
 fn b_spline_basis(i: usize, k: usize, t: f32, knots: &[f32]) -> f32 {
     if k == 0 {
@@ -34,7 +37,7 @@ pub struct NurbsSurface {
     pub v_count: usize,
     pub degree: usize,
     pub splits: usize,
-    pub selected_point_idx: Option<usize>,
+    pub selected_point_idx: usize,
 }
 
 impl AsMesh for NurbsSurface {
@@ -160,5 +163,31 @@ impl AsMesh for NurbsSurface {
             indices,
             aabb,
         }
+    }
+}
+
+impl EditableMesh for NurbsSurface {
+    fn ui(&mut self, ui: &imgui::Ui) -> bool {
+        let mut changed = false;
+        ui.text("NURBS 曲面参数");
+
+        ui.slider(
+            "控制点索引",
+            0,
+            self.control_points.len().saturating_sub(1),
+            &mut self.selected_point_idx,
+        );
+
+        if self.selected_point_idx < self.control_points.len() {
+            ui.text_colored([1.0, 1.0, 0.0, 1.0], "编辑中...");
+            let cp = &mut self.control_points[self.selected_point_idx];
+            changed |= Drag::new("控制点 X").speed(0.01).build(ui, &mut cp[0]);
+            changed |= Drag::new("控制点 Y").speed(0.01).build(ui, &mut cp[1]);
+            changed |= Drag::new("控制点 Z").speed(0.01).build(ui, &mut cp[2]);
+
+            let w = &mut self.weights[self.selected_point_idx];
+            changed |= Drag::new("权重").range(0.1, 100.0).speed(0.01).build(ui, w);
+        }
+        changed
     }
 }
