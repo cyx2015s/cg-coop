@@ -76,7 +76,7 @@ impl AABB {
             ],
         );
 
-        return global_aabb;
+        global_aabb
     }
     pub fn union_point_array(&mut self, v: [f32; 3]) {
         self.min = self.min.min(glam::f32::Vec3::from_array(v));

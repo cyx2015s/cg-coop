@@ -1,4 +1,3 @@
-use crate::core::math::ray;
 use crate::geometry::shape::cone::Cone;
 use crate::geometry::shape::cube::Cube;
 use crate::geometry::shape::cylinder::Cylinder;
@@ -6,7 +5,7 @@ use crate::geometry::shape::mesh::Mesh;
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::sphere::Sphere;
 use crate::scene::camera;
-use crate::scene::world::{GameObject, ShapeKind, World};
+use crate::scene::world::{GameObject, World};
 use crate::ui::{UIBuild, UIHandle};
 use imgui::Condition;
 
@@ -156,7 +155,7 @@ impl UIBuild for World {
                         Box::new(NurbsSurface {
                             degree: 3,
                             control_points: pts,
-                            weights: weights,
+                            weights,
                             u_count: 4,
                             v_count: 4,
                             splits: 32,
@@ -165,12 +164,11 @@ impl UIBuild for World {
                         self.default_mat,
                     ));
                 }
-                if ui.button("导入模型") {
-                    if let Ok(mesh) = Mesh::load_obj("output.obj") {
-                        let mut obj = GameObject::new("Imported", Box::new(mesh), self.default_mat);
+                if ui.button("导入模型")
+                    && let Ok(mesh) = Mesh::load_obj("output.obj") {
+                        let obj = GameObject::new("Imported", Box::new(mesh), self.default_mat);
                         self.add_object(obj);
                     }
-                }
 
                 ui.separator();
                 ui.text("场景物体:");

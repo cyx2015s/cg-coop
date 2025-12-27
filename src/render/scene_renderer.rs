@@ -45,7 +45,7 @@ impl SceneRenderer {
             glium::texture::MipmapsOption::NoMipmap,
             SHADOW_SIZE,
             SHADOW_SIZE,
-            128 as u32,
+            128_u32,
         )
         .unwrap();
 
@@ -103,11 +103,7 @@ impl SceneRenderer {
             self.light_block.lights[idx] = light_obj.light;
             self.light_block.num_lights += 1;
         }
-        if world.debug_frustum {
-            self.shadow_pass.freeze_debug_boxes = true;
-        } else {
-            self.shadow_pass.freeze_debug_boxes = false;
-        }
+        self.shadow_pass.freeze_debug_boxes = world.debug_frustum;
 
         if world.debug {
             self.quad_pass

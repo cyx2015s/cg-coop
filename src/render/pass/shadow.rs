@@ -189,7 +189,7 @@ impl ShadowPass {
                 }
             }
         }
-        return corners;
+        corners
     }
 
     fn compute_cascade_light_matrix(
@@ -309,7 +309,7 @@ impl ShadowPass {
                     shadow_atlas,
                     light_space_matrix,
                     display,
-                    layer as u32,
+                    layer,
                     scene,
                 );
             }

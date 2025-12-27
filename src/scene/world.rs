@@ -5,8 +5,7 @@ use crate::core::material::{Material, Phong};
 use crate::core::math::aabb::AABB;
 use crate::core::math::transform::Transform;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
-use crate::geometry::shape::nurbs::NurbsSurface;
-use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
+use crate::geometry::shape::{cube::Cube, sphere::Sphere};
 use crate::physics::collision::{apply_gravity, predict_position, resolve_collision};
 
 use glutin::surface::WindowSurface;
@@ -225,6 +224,12 @@ pub struct World {
     pub gravity: [f32; 3],
 }
 
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl World {
     pub fn new() -> Self {
         Self {
@@ -331,7 +336,7 @@ impl World {
             let mesh_aabb = mesh_aabb.get_global_aabb(model_matrix);
             aabb.union_aabb(&mesh_aabb);
         }
-        return aabb;
+        aabb
     }
     pub fn new_camera(&mut self, name: &str, aspect: f32) {
         let camera = CameraObject {
@@ -428,11 +433,10 @@ impl World {
     }
 
     pub fn get_selected_camera(&self) -> Option<usize> {
-        if let Some(idx) = self.selected_camera {
-            if idx < self.cameras.len() {
+        if let Some(idx) = self.selected_camera
+            && idx < self.cameras.len() {
                 return Some(idx);
             }
-        }
         None
     }
 
@@ -442,11 +446,10 @@ impl World {
     }
 
     pub fn get_selected_light(&mut self) -> Option<&mut LightObject> {
-        if let Some(idx) = self.selected_light {
-            if idx < self.lights.len() {
+        if let Some(idx) = self.selected_light
+            && idx < self.lights.len() {
                 return Some(&mut self.lights[idx]);
             }
-        }
         None
     }
     pub fn add_object(&mut self, obj: GameObject) {
@@ -455,11 +458,10 @@ impl World {
     }
 
     pub fn get_selected_mut(&mut self) -> Option<&mut GameObject> {
-        if let Some(idx) = self.selected_index {
-            if idx < self.objects.len() {
+        if let Some(idx) = self.selected_index
+            && idx < self.objects.len() {
                 return Some(&mut self.objects[idx]);
             }
-        }
         None
     }
 }

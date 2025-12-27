@@ -26,12 +26,9 @@ fn main() {
         global_ctx.handle_event(&ev, &window);
         match ev {
             Event::DeviceEvent { device_id, event } => {
-                match event {
-                    DeviceEvent::MouseMotion { delta } => {
-                        
-                        scene.handle_mouse_move(delta, &window);
-                    },
-                    _ => {}
+                if let DeviceEvent::MouseMotion { delta } = event {
+                    
+                    scene.handle_mouse_move(delta, &window);
                 }
             }
             Event::WindowEvent { event, .. } => match event {

@@ -1,4 +1,4 @@
-use crate::scene::world::{BodyType, GameObject, ShapeKind};
+use crate::scene::world::{BodyType, GameObject};
 use crate::ui::UIBuild;
 use imgui::{Condition, Drag};
 
@@ -8,7 +8,7 @@ impl UIBuild for GameObject {
             .size([250.0, 500.0], Condition::FirstUseEver)
             .position([240.0, 150.0], Condition::FirstUseEver)
             .build(|| {
-                ui.text_colored([0.0, 1.0, 0.0, 1.0], &format!("当前选中: {}", self.name));
+                ui.text_colored([0.0, 1.0, 0.0, 1.0], format!("当前选中: {}", self.name));
                 ui.separator();
                 ui.text("变换 (Transform)");
                 let mut pos = self.transform.position.to_array();
@@ -122,14 +122,14 @@ impl UIBuild for GameObject {
                 // }
                 match self.rendering.selected_vertex_index {
                     Some(idx) => {
-                        ui.text_colored([1.0, 1.0, 0.0, 1.0], &format!("编辑顶点 {}", idx));
+                        ui.text_colored([1.0, 1.0, 0.0, 1.0], format!("编辑顶点 {}", idx));
                         let v = &mut self.mesh.vertices[idx];
-                        if Drag::new("X").speed(0.01).build(ui, &mut v[0]) {}
-                        if Drag::new("Y").speed(0.01).build(ui, &mut v[1]) {}
-                        if Drag::new("Z").speed(0.01).build(ui, &mut v[2]) {}
+                        Drag::new("X").speed(0.01).build(ui, &mut v[0]);
+                        Drag::new("Y").speed(0.01).build(ui, &mut v[1]);
+                        Drag::new("Z").speed(0.01).build(ui, &mut v[2]);
 
                         let t = &mut self.mesh.tex_coords[idx];
-                        if Drag::new("U").speed(0.01).build(ui, &mut t[0]) {}
+                        Drag::new("U").speed(0.01).build(ui, &mut t[0]);
                         if Drag::new("V").speed(0.01).build(ui, &mut t[1]) {}
                     }
                     None => {

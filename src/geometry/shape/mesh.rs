@@ -174,7 +174,7 @@ impl Mesh {
     }
 
     pub fn get_vertex(&self, index: usize) -> &[f32; 3] {
-        return &self.vertices[index];
+        &self.vertices[index]
     }
 }
 

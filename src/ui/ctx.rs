@@ -34,7 +34,7 @@ impl GlobalContext {
 
         ui_platform.attach_window(
             ui_ctx.io_mut(),
-            &window,
+            window,
             imgui_winit_support::HiDpiMode::Locked(1.0),
         );
 

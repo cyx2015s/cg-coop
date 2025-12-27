@@ -84,7 +84,7 @@ impl QuadPass {
             layer: layer as i32,
         };
         target
-            .draw(&self.vbo, &self.indices, &self.program, &uniforms, &params)
+            .draw(&self.vbo, self.indices, &self.program, &uniforms, &params)
             .unwrap();
     }
 }

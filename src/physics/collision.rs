@@ -35,7 +35,7 @@ pub fn resolve_collision(
         max: predicted_pos + half_size,
     };
 
-    if aabb_intersect(&dynamic_aabb, &static_body_aabb) {
+    if aabb_intersect(&dynamic_aabb, static_body_aabb) {
         let penetration = static_body_aabb.max.y - dynamic_aabb.min.y;
         dynamic_body.transform.position.y += penetration;
         dynamic_body.physics.velocity[1] =

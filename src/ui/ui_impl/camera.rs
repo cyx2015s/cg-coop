@@ -8,7 +8,7 @@ impl UIBuild for CameraObject {
             .size([250.0, 500.0], Condition::FirstUseEver)
             .position([240.0, 150.0], Condition::FirstUseEver)
             .build(|| {
-                ui.text_colored([0.0, 1.0, 0.0, 1.0], &format!("当前选中: {}", self.name));
+                ui.text_colored([0.0, 1.0, 0.0, 1.0], format!("当前选中: {}", self.name));
                 ui.separator();
 
                 let epsilon = 0.001;
