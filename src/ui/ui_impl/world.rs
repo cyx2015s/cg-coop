@@ -265,6 +265,7 @@ impl UIHandle for World {
                 }
 
                 if camera.move_state == camera::MoveState::RigidBody {
+                    
                     camera.set_dynamic();
                     self.camera_force[0] = ui.is_key_down(imgui::Key::W);
                     self.camera_force[1] = ui.is_key_down(imgui::Key::S);
