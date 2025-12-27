@@ -1,4 +1,4 @@
-use crate::{core::math::aabb::AABB, physics::rigid::RigidBody, scene::world::GameObject};
+use crate::{core::math::aabb::AABB, physics::rigid::RigidBody};
 
 // 检测两个AABB是否相交
 pub fn aabb_intersect(a: &AABB, b: &AABB) -> bool {

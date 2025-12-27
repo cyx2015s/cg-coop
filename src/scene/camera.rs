@@ -1,6 +1,7 @@
+use std::f32;
+
 use crate::{
     core::math::transform,
-    physics::rigid::RigidBody,
     scene::world::{BodyType, PhysicalProperties},
 };
 
@@ -48,14 +49,14 @@ impl Camera {
         Self {
             transform: transform::Transform::default(),
             physics: PhysicalProperties::default(),
-            fovy: 3.141592 / 3.0,
+            fovy: f32::consts::PI / 3.0,
             aspect,
             znear: 0.1,
             zfar: 50.0,
             pitch: 0.0,
             yaw: 0.0,
             force: 9.5,
-            up_velocity: 10.0,
+            up_velocity: 4.0,
 
             move_state: MoveState::Locked,
             pan_obit_speed: 1.0,
@@ -152,17 +153,17 @@ impl Camera {
         let right = up.cross(forward).normalize();
         let mut f_force = forward * self.force;
         let mut r_force = right * self.force;
-        if flag[0] != flag[1] && flag[0] == false {
+        if flag[0] != flag[1] && !flag[0] {
             f_force *= -1.0;
         } else if flag[0] == flag[1] {
             f_force *= 0.0;
         }
-        if flag[2] != flag[3] && flag[2] == false {
+        if flag[2] != flag[3] && !flag[2] {
             r_force *= -1.0;
         } else if flag[2] == flag[3] {
             r_force *= 0.0;
         }
-        if flag[4] == true && self.physics.velocity[1].abs() < 0.01 {
+        if flag[4] && self.physics.velocity[1].abs() < 0.01 {
             self.physics.velocity[1] = self.up_velocity;
         }
         self.physics.force = (f_force + r_force).to_array();

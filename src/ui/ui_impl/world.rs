@@ -5,11 +5,12 @@ use crate::geometry::shape::mesh::Mesh;
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::sphere::Sphere;
 use crate::scene::world::{GameObject, World};
-use crate::scene::{camera, world};
+use crate::scene::{camera};
 use crate::ui::{UIBuild, UIHandle};
 use imgui::Condition;
 
 use glutin::surface::WindowSurface;
+use std::f32::{self, consts};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 impl UIBuild for World {
@@ -301,7 +302,7 @@ impl UIHandle for World {
                     }
                 }
                 if ui.is_key_pressed(imgui::Key::R) {
-                    camera.fovy = 3.141592 / 2.0;
+                    camera.fovy = consts::PI / 2.0;
                 }
                 if ui.is_key_pressed(imgui::Key::P) {
                     let now = SystemTime::now();

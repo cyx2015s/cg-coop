@@ -8,14 +8,17 @@ pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
 }
-
-impl AABB {
-    pub fn default() -> Self {
+impl Default for AABB {
+    fn default() -> Self {
         Self {
             min: Vec3::INFINITY,
             max: Vec3::NEG_INFINITY,
         }
     }
+}
+
+impl AABB {
+
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
@@ -31,12 +34,11 @@ impl AABB {
             if ray.d.y < 0.0 { 1 } else { 0 },
             if ray.d.z < 0.0 { 1 } else { 0 },
         );
-        return self.intersect_full(ray, inv_dir, sign);
+        self.intersect_full(ray, inv_dir, sign)
     }
 
     pub fn intersect_full(&self, ray: &Ray, inv_dir: Vec3, sign: glam::usize::USizeVec3) -> bool {
         let o = &ray.o;
-        let d = &ray.d;
 
         let t_min_x = (self[sign.x].x - o.x) * inv_dir.x;
         let t_max_x = (self[1 - sign.x].x - o.x) * inv_dir.x;
@@ -48,7 +50,7 @@ impl AABB {
         let t_min = t_min_x.max(t_min_y).max(t_min_z);
         let t_max_ = t_max_x.min(t_max_y).min(t_max_z);
 
-        return t_min < t_max_ && t_max_ > 0.0 && t_min < ray.t_max;
+        t_min < t_max_ && t_max_ > 0.0 && t_min < ray.t_max
     }
     pub fn get_half_extents(&self) -> Vec3 {
         (self.max - self.min) * 0.5
@@ -81,7 +83,7 @@ impl AABB {
             ],
         );
 
-        return global_aabb;
+        global_aabb
     }
     pub fn union_point_array(&mut self, v: [f32; 3]) {
         self.min = self.min.min(glam::f32::Vec3::from_array(v));

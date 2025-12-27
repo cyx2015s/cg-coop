@@ -402,7 +402,7 @@ impl World {
                     let predicted_pos = predict_position(&self.cameras[i], dt);
                     self.cameras[i].camera.transform.position = predicted_pos;
                 }
-                BodyHandle::Object(i) => {}
+                BodyHandle::Object(_i) => {}
             }
         }
     }
@@ -450,7 +450,8 @@ impl World {
                 && !mouse_state.is_locked()
             {
                 mouse_state.toggle_lock(window);
-            } else if mouse_state.is_locked()
+            } 
+            else if mouse_state.is_locked()
                 && (camera.move_state != crate::scene::camera::MoveState::Free
                     && camera.move_state != crate::scene::camera::MoveState::RigidBody)
             {
