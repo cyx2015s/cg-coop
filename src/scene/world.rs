@@ -104,8 +104,8 @@ impl RigidBody for CameraObject {
     fn restitution(&self) -> f32 { self.camera.physics.restitution }
     fn aabb(&self) -> AABB {
         AABB {
-            min: glam::Vec3::new(-0.3, -0.5, -0.3),
-            max: glam::Vec3::new(0.3, 0.5, 0.3),
+            min: glam::Vec3::new(-0.3, -1.5, -0.3),
+            max: glam::Vec3::new(0.3, 1.5, 0.3),
         }.get_global_aabb(self.camera.transform.get_matrix())
     }
 }
@@ -206,8 +206,7 @@ impl World {
         }
     }
 
-    pub fn step(&mut self, dt: f32) {
-        // 1. 门窗动画
+        pub fn step(&mut self, dt: f32) {
         for obj in &mut self.objects {
             if let InteractionBehavior::Door { is_open, base_yaw } = obj.behavior {
                 let target_yaw = if is_open { base_yaw + 1.5708 } else { base_yaw };
@@ -217,39 +216,56 @@ impl World {
             }
         }
 
-        // 2. 物理碰撞
-        let ptr = self.objects.as_mut_ptr();
-        let len = self.objects.len();
+        let mut bodies: Vec<BodyHandle> = Vec::new();
+        for i in 0..self.objects.len() {
+            bodies.push(BodyHandle::Object(i));
+        }
+        if let Some(idx) = self.get_selected_camera() {
+            bodies.push(BodyHandle::Camera(idx));
+        }
         let gravity = glam::f32::Vec3::from_array(self.gravity);
-
-        for i in 0..len {
-            let dynamic_obj = unsafe { &mut *ptr.add(i) };
-
-            if !dynamic_obj.rendering.visible || dynamic_obj.physics.body_type != BodyType::Dynamic {
-                continue;
-            }
-
-            apply_gravity(dynamic_obj, gravity, dt);
-
+        for i in 0..bodies.len() {
             let mut collided = false;
-            for j in 0..len {
-                if i == j { continue; }
-                // 【修复】这里必须是 &mut，因为 resolve_collision 签名要求两个参数都是 &mut dyn RigidBody
-                let static_obj = unsafe { &mut *ptr.add(j) };
-                
-                if !static_obj.rendering.visible { continue; }
+            for j in 0..bodies.len() {
+                if i == j {
+                    continue;
+                }
+                let (a, b) = self.get_two_bodies_mut(bodies[i], bodies[j]);
+                if !a.is_dynamic() {
+                    break;
+                }
+                apply_gravity(a, gravity, dt);
 
-                if resolve_collision(dynamic_obj, static_obj, dt) {
+                if resolve_collision(a, b, dt) {
                     collided = true;
+                    break;
                 }
             }
-            
+
             if !collided {
-                let predicted = predict_position(dynamic_obj, dt);
-                dynamic_obj.transform.position = predicted;
+                match bodies[i] {
+                    BodyHandle::Object(i) => {
+                        let predicted_pos = predict_position(&self.objects[i], dt);
+                        self.objects[i].transform.position = predicted_pos;
+                    }
+                    BodyHandle::Camera(i) => {
+                        let predicted_pos = predict_position(&self.cameras[i], dt);
+                        self.cameras[i].camera.transform.position = predicted_pos;
+                    }
+                }
+            }
+
+            match bodies[i] {
+                BodyHandle::Camera(i) => {
+                    self.cameras[i].update_velocity(dt);
+                    let predicted_pos = predict_position(&self.cameras[i], dt);
+                    self.cameras[i].camera.transform.position = predicted_pos;
+                }
+                BodyHandle::Object(_i) => {}
             }
         }
     }
+
 
     pub fn handle_interaction_input(&mut self, player_pos: glam::f32::Vec3) {
         let mut nearest_idx = None;
@@ -310,7 +326,40 @@ impl World {
         }
         self.objects.append(&mut shards);
     }
+    fn get_two_bodies_mut(
+        &mut self,
+        a: BodyHandle,
+        b: BodyHandle,
+    ) -> (&mut dyn RigidBody, &mut dyn RigidBody) {
+        match (a, b) {
+            (BodyHandle::Object(i), BodyHandle::Object(j)) => {
+                if i < j {
+                    let (left, right) = self.objects.split_at_mut(i + 1);
+                    (&mut left[i], &mut right[j - i - 1])
+                } else {
+                    let (left, right) = self.objects.split_at_mut(j + 1);
+                    (&mut right[i - j - 1], &mut left[j])
+                }
+            }
 
+            (BodyHandle::Camera(i), BodyHandle::Camera(j)) => {
+                let (left, right) = self.cameras.split_at_mut(j);
+                (&mut left[i], &mut right[0])
+            }
+
+            (BodyHandle::Object(i), BodyHandle::Camera(j)) => {
+                let obj = &mut self.objects[i];
+                let cam = &mut self.cameras[j];
+                (obj, cam)
+            }
+
+            (BodyHandle::Camera(i), BodyHandle::Object(j)) => {
+                let cam = &mut self.cameras[i];
+                let obj = &mut self.objects[j];
+                (cam, obj)
+            }
+        }
+    }
     pub fn create_door(&mut self, pos: glam::f32::Vec3) {
         let width = 1.0;
         let height = 2.0;
@@ -342,10 +391,11 @@ impl World {
     }
 
     pub fn new_camera(&mut self, name: &str, aspect: f32) {
-        let camera = CameraObject {
+        let mut camera = CameraObject {
             name: name.to_string(),
             camera: Camera::new(aspect),
         };
+        camera.camera.init();
         self.add_camera(camera);
     }
 

@@ -72,6 +72,7 @@ impl Camera {
         self.transform
             .look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
         self.physics.friction = [8.0; 3];
+        self.physics.restitution = 0.0;
         self.rotate(0.0, 0.0);
     }
 

@@ -292,6 +292,22 @@ impl UIHandle for World {
                         camera.transform.position -= glam::f32::Vec3::Y * move_speed;
                     }
                 }
+
+                if camera.move_state == camera::MoveState::RigidBody {
+                    
+                    camera.set_dynamic();
+                    self.camera_force[0] = ui.is_key_down(imgui::Key::W);
+                    self.camera_force[1] = ui.is_key_down(imgui::Key::S);
+                    self.camera_force[2] = ui.is_key_down(imgui::Key::A);
+                    self.camera_force[3] = ui.is_key_down(imgui::Key::D);
+                    self.camera_force[4] = ui.is_key_down(imgui::Key::Space);
+                    self.camera_force[5] = ui.is_key_down(imgui::Key::LeftShift);
+                    if ui.is_key_down(imgui::Key::LeftShift) { camera.force = 1.5 * 9.5; }
+                    else { camera.force = 9.5; }
+                    camera.update_impluse(self.camera_force);
+                } else {
+                    camera.set_static();
+                }
             }
 
             {
