@@ -1,5 +1,5 @@
-use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::core::math::aabb::AABB;
+use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::scene::world::EditableMesh;
 use std::f32::consts::PI;
 
@@ -11,7 +11,10 @@ pub struct Cone {
 
 impl AsMesh for Cone {
     fn as_mesh(&self) -> Mesh {
-        let aabb = AABB::new_from_array([-self.radius, -self.height / 2.0, -self.radius], [self.radius, self.height / 2.0, self.radius]);
+        let aabb = AABB::new_from_array(
+            [-self.radius, -self.height / 2.0, -self.radius],
+            [self.radius, self.height / 2.0, self.radius],
+        );
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut tex_coords = Vec::new();
@@ -101,13 +104,17 @@ impl EditableMesh for Cone {
     fn ui(&mut self, ui: &imgui::Ui) -> bool {
         let mut changed = false;
         ui.text("锥体参数");
-        changed |= imgui::Drag::new("底半径").speed(0.05).build(ui, &mut self.radius);
-        changed |= imgui::Drag::new("高度").speed(0.1).build(ui, &mut self.height);
-        changed |= imgui::Drag::new("精度").speed(1.0).build(ui, &mut self.sectors);
+        changed |= imgui::Drag::new("底半径")
+            .speed(0.05)
+            .build(ui, &mut self.radius);
+        changed |= imgui::Drag::new("高度")
+            .speed(0.1)
+            .build(ui, &mut self.height);
+        changed |= imgui::Drag::new("精度")
+            .speed(1.0)
+            .build(ui, &mut self.sectors);
         changed
     }
-    
-    fn debug_ui(&mut self, _ui: &imgui::Ui) {
-    
-    }
+
+    fn debug_ui(&mut self, _ui: &imgui::Ui) {}
 }

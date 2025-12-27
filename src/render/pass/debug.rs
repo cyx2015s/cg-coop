@@ -1,12 +1,10 @@
-
-
 use glium::uniform;
 use glium::{Program, Surface};
 use glutin::surface::WindowSurface;
 
 use crate::core::vertex::Vertex;
 
-use crate::render::shader::{create_program};
+use crate::render::shader::create_program;
 use crate::scene::world::ShapeKind;
 use crate::scene::world::World;
 

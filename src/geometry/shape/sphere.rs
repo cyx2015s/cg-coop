@@ -1,8 +1,8 @@
 use imgui::Drag;
 
+use crate::core::math::aabb::AABB;
 use crate::geometry::shape::mesh;
 use crate::geometry::shape::mesh::AsMesh;
-use crate::core::math::aabb::AABB;
 use crate::scene::world::EditableMesh;
 pub struct Sphere {
     pub radius: f32,
@@ -11,8 +11,8 @@ pub struct Sphere {
 }
 
 impl AsMesh for Sphere {
-    fn as_mesh(&self) ->  mesh::Mesh {
-        let aabb = AABB::new_from_array([-self.radius;3],[self.radius;3]);
+    fn as_mesh(&self) -> mesh::Mesh {
+        let aabb = AABB::new_from_array([-self.radius; 3], [self.radius; 3]);
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut tex_coords = Vec::new();
@@ -70,8 +70,12 @@ impl EditableMesh for Sphere {
         let mut changed = false;
         ui.text("球体参数");
         changed |= Drag::new("半径").speed(0.1).build(ui, &mut self.radius);
-        changed |= Drag::new("列划分数").speed(1.0).build(ui, &mut self.col_divisions);
-        changed |= Drag::new("行划分数").speed(1.0).build(ui, &mut self.row_divisions);
+        changed |= Drag::new("列划分数")
+            .speed(1.0)
+            .build(ui, &mut self.col_divisions);
+        changed |= Drag::new("行划分数")
+            .speed(1.0)
+            .build(ui, &mut self.row_divisions);
         changed
     }
 }

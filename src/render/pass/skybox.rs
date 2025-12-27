@@ -1,4 +1,7 @@
-use glium::{Surface, texture::{RawImage2d, Texture2dArray}};
+use glium::{
+    Surface,
+    texture::{RawImage2d, Texture2dArray},
+};
 use glutin::surface::WindowSurface;
 
 use crate::{render::shader::create_program, scene::World};
@@ -13,54 +16,71 @@ glium::implement_vertex!(SkyboxVertex, position);
 fn skybox_vertices() -> Vec<SkyboxVertex> {
     let v = [
         // 后
-        [-1.0,  1.0, -1.0], [-1.0, -1.0, -1.0], [ 1.0, -1.0, -1.0],
-        [ 1.0, -1.0, -1.0], [ 1.0,  1.0, -1.0], [-1.0,  1.0, -1.0],
-
+        [-1.0, 1.0, -1.0],
+        [-1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, 1.0, -1.0],
+        [-1.0, 1.0, -1.0],
         // 前
-        [-1.0, -1.0,  1.0], [-1.0,  1.0,  1.0], [ 1.0,  1.0,  1.0],
-        [ 1.0,  1.0,  1.0], [ 1.0, -1.0,  1.0], [-1.0, -1.0,  1.0],
-
+        [-1.0, -1.0, 1.0],
+        [-1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+        [-1.0, -1.0, 1.0],
         // 左
-        [-1.0,  1.0,  1.0], [-1.0, -1.0,  1.0], [-1.0, -1.0, -1.0],
-        [-1.0, -1.0, -1.0], [-1.0,  1.0, -1.0], [-1.0,  1.0,  1.0],
-
+        [-1.0, 1.0, 1.0],
+        [-1.0, -1.0, 1.0],
+        [-1.0, -1.0, -1.0],
+        [-1.0, -1.0, -1.0],
+        [-1.0, 1.0, -1.0],
+        [-1.0, 1.0, 1.0],
         // 右
-        [ 1.0, -1.0, -1.0], [ 1.0, -1.0,  1.0], [ 1.0,  1.0,  1.0],
-        [ 1.0,  1.0,  1.0], [ 1.0,  1.0, -1.0], [ 1.0, -1.0, -1.0],
-
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, -1.0],
+        [1.0, -1.0, -1.0],
         // 上
-        [-1.0,  1.0, -1.0], [ 1.0,  1.0, -1.0], [ 1.0,  1.0,  1.0],
-        [ 1.0,  1.0,  1.0], [-1.0,  1.0,  1.0], [-1.0,  1.0, -1.0],
-
+        [-1.0, 1.0, -1.0],
+        [1.0, 1.0, -1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [-1.0, 1.0, 1.0],
+        [-1.0, 1.0, -1.0],
         // 下
-        [-1.0, -1.0, -1.0], [-1.0, -1.0,  1.0], [ 1.0, -1.0, -1.0],
-        [ 1.0, -1.0, -1.0], [-1.0, -1.0,  1.0], [ 1.0, -1.0,  1.0],
+        [-1.0, -1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [1.0, -1.0, 1.0],
     ];
 
     v.iter().map(|&p| SkyboxVertex { position: p }).collect()
 }
 
-fn load_skybox_array(
-    display: &glium::Display<WindowSurface>
-) -> Texture2dArray {
+fn load_skybox_array(display: &glium::Display<WindowSurface>) -> Texture2dArray {
     let faces = [
-        "assets/texture/skyboxrt/right.jpg",   // +X
-        "assets/texture/skyboxrt/left.jpg",    // -X
-        "assets/texture/skyboxrt/top.jpg",     // +Y
-        "assets/texture/skyboxrt/bottom.jpg",  // -Y
-        "assets/texture/skyboxrt/front.jpg",   // +Z
-        "assets/texture/skyboxrt/back.jpg",    // -Z
+        "assets/texture/skyboxrt/right.jpg",  // +X
+        "assets/texture/skyboxrt/left.jpg",   // -X
+        "assets/texture/skyboxrt/top.jpg",    // +Y
+        "assets/texture/skyboxrt/bottom.jpg", // -Y
+        "assets/texture/skyboxrt/front.jpg",  // +Z
+        "assets/texture/skyboxrt/back.jpg",   // -Z
     ];
 
-    let images: Vec<RawImage2d<u8>> = faces.iter().map(|path| {
-        let img = image::open(path).unwrap().to_rgba8();
-        let dims = img.dimensions();
+    let images: Vec<RawImage2d<u8>> = faces
+        .iter()
+        .map(|path| {
+            let img = image::open(path).unwrap().to_rgba8();
+            let dims = img.dimensions();
 
-        RawImage2d::from_raw_rgba_reversed(
-            &img.into_raw(),
-            dims,
-        )
-    }).collect();
+            RawImage2d::from_raw_rgba_reversed(&img.into_raw(), dims)
+        })
+        .collect();
 
     Texture2dArray::new(display, images).unwrap()
 }
@@ -75,15 +95,18 @@ impl SkyboxPass {
         let program = create_program(
             display,
             "assets/shaders/skybox.vert",
-            "assets/shaders/skybox.frag");
+            "assets/shaders/skybox.frag",
+        );
         let skybox = load_skybox_array(display);
-        Self { 
-            program,
-            skybox,
-        }
+        Self { program, skybox }
     }
 
-    pub fn render(&mut self, target: &mut glium::Frame, display: &glium::Display<WindowSurface>, world: &mut World){
+    pub fn render(
+        &mut self,
+        target: &mut glium::Frame,
+        display: &glium::Display<WindowSurface>,
+        world: &mut World,
+    ) {
         let params = glium::DrawParameters {
             depth: glium::Depth {
                 test: glium::DepthTest::IfLessOrEqual,
@@ -107,15 +130,16 @@ impl SkyboxPass {
                 view: view,
                 skybox: skybox_sampler,
             };
-            let vertex_data = glium::VertexBuffer::new(display,&skybox_vertices()).unwrap();
-            target.draw(
-                &vertex_data,
-                glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
-                &self.program,
-                &uniforms,
-                &params ).unwrap();
+            let vertex_data = glium::VertexBuffer::new(display, &skybox_vertices()).unwrap();
+            target
+                .draw(
+                    &vertex_data,
+                    glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
+                    &self.program,
+                    &uniforms,
+                    &params,
+                )
+                .unwrap();
         }
-        
-
     }
 }

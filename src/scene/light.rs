@@ -42,7 +42,7 @@ impl Light {
         }
     }
 
-    pub fn get_light_space_matrix(&self) -> [[f32; 4];4] {
+    pub fn get_light_space_matrix(&self) -> [[f32; 4]; 4] {
         let light_dir = glam::Vec3::from(self.direction).normalize();
         let light_pos = glam::Vec3::ZERO - light_dir * 20.0;
         let light_projection = glam::Mat4::orthographic_rh(-20.0, 20.0, -20.0, 20.0, 1.0, 50.0);
@@ -73,8 +73,6 @@ impl Default for Light {
         Self::new()
     }
 }
-
-
 
 // using mat4 to pass the light
 // px, dx, cr, kc

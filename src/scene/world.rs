@@ -70,9 +70,7 @@ pub trait EditableMesh: AsMesh {
         false
     }
     /// 物体渲染分为两步，基础的和调试的
-    fn debug_ui(&mut self, _ui: &imgui::Ui) {
-        
-    }
+    fn debug_ui(&mut self, _ui: &imgui::Ui) {}
 }
 
 pub struct GameObject {

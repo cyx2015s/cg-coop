@@ -1,7 +1,7 @@
 use imgui::Drag;
 
-use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::core::math::aabb::AABB;
+use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::scene::world::EditableMesh;
 pub struct Cube {
     pub width: f32,

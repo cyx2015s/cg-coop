@@ -9,8 +9,7 @@ pub struct Vertex {
 implement_vertex!(Vertex, position, tex_coord, normal);
 
 #[derive(Copy, Clone)]
-pub struct Triangle <'a> {
+pub struct Triangle<'a> {
     pub v: [u16; 3],
     pub vertices: &'a [[f32; 3]],
 }
-

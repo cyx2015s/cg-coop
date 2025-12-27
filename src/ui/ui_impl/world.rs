@@ -167,8 +167,7 @@ impl UIBuild for World {
                 }
                 if ui.button("导入模型") {
                     if let Ok(mesh) = Mesh::load_obj("output.obj") {
-                        let mut obj =
-                            GameObject::new("Imported", Box::new(mesh), self.default_mat);
+                        let mut obj = GameObject::new("Imported", Box::new(mesh), self.default_mat);
                         self.add_object(obj);
                     }
                 }

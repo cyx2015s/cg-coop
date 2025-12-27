@@ -2,13 +2,13 @@ use crate::implement_uniform_block_new;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
-pub struct RaytracingMaterialBlock { 
+pub struct RaytracingMaterialBlock {
     pub material: RaytracingMaterial,
 }
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
-pub struct RaytracingMaterial { 
+pub struct RaytracingMaterial {
     pub ty: i32,
     pub ior: f32,
     pub fuzz: f32,
@@ -155,4 +155,3 @@ impl Lambertian {
         data
     }
 }
-

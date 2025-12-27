@@ -1,12 +1,12 @@
-use super::pass::{ShadowPass, ForwardPass, QuadPass, DebugPass};
+use super::pass::{DebugPass, ForwardPass, QuadPass, ShadowPass};
 
-use crate::render::pass::SkyboxPass;
-use crate::scene::light::{LightBlock, Light};
-use crate::scene::World;
 use crate::implement_uniform_block_new;
+use crate::render::pass::SkyboxPass;
+use crate::scene::World;
+use crate::scene::light::{Light, LightBlock};
 
-use glutin::surface::WindowSurface;
 use glium::texture::DepthTexture2dArray;
+use glutin::surface::WindowSurface;
 
 const SHADOW_SIZE: u32 = 2048;
 
@@ -18,7 +18,7 @@ pub struct LightSpaceMatrix {
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
-pub struct LightSpaceMatrixBlock{
+pub struct LightSpaceMatrixBlock {
     pub light_space_matrix: [LightSpaceMatrix; 128],
 }
 
@@ -38,7 +38,6 @@ pub struct SceneRenderer {
 
 impl SceneRenderer {
     pub fn new(display: &glium::Display<WindowSurface>) -> Self {
-
         // 创建阴影贴图
         let shadow_atlas = DepthTexture2dArray::empty_with_format(
             display,
@@ -47,28 +46,25 @@ impl SceneRenderer {
             SHADOW_SIZE,
             SHADOW_SIZE,
             128 as u32,
-        ).unwrap();
+        )
+        .unwrap();
 
-        let light_matrix_block = LightSpaceMatrixBlock{
-            light_space_matrix: [LightSpaceMatrix{ matrix: [[0.0;4];4] }; 128],
+        let light_matrix_block = LightSpaceMatrixBlock {
+            light_space_matrix: [LightSpaceMatrix {
+                matrix: [[0.0; 4]; 4],
+            }; 128],
         };
-            
-        
-        let light_space_matrix_ubo = glium::uniforms::UniformBuffer::new(
-                display,
-                light_matrix_block
-        ).unwrap();
-        
-        let light_block = LightBlock{
+
+        let light_space_matrix_ubo =
+            glium::uniforms::UniformBuffer::new(display, light_matrix_block).unwrap();
+
+        let light_block = LightBlock {
             lights: [Light::new(); 32],
             num_lights: 0,
         };
 
-        let light_block_ubo = glium::uniforms::UniformBuffer::new(
-                display,
-                light_block
-        ).unwrap();
-        
+        let light_block_ubo = glium::uniforms::UniformBuffer::new(display, light_block).unwrap();
+
         Self {
             shadow_atlas,
             light_matrix_block,
@@ -81,8 +77,12 @@ impl SceneRenderer {
         }
     }
 
-    pub fn render(&mut self, display: &glium::Display<WindowSurface>, world: &mut World, target: &mut glium::Frame) {
-
+    pub fn render(
+        &mut self,
+        display: &glium::Display<WindowSurface>,
+        world: &mut World,
+        target: &mut glium::Frame,
+    ) {
         let (width, height) = display.get_framebuffer_dimensions();
         let aspect = width as f32 / height as f32;
         if let Some(idx) = world.get_selected_camera() {
@@ -91,8 +91,13 @@ impl SceneRenderer {
         }
         self.skybox_pass.render(target, display, world);
 
-        self.shadow_pass.render(&mut self.shadow_atlas, &mut self.light_matrix_block, display, world);
-        
+        self.shadow_pass.render(
+            &mut self.shadow_atlas,
+            &mut self.light_matrix_block,
+            display,
+            world,
+        );
+
         self.light_block.num_lights = 0;
         for (idx, light_obj) in world.lights.iter().enumerate() {
             self.light_block.lights[idx] = light_obj.light;
@@ -100,19 +105,25 @@ impl SceneRenderer {
         }
         if world.debug_frustum {
             self.shadow_pass.freeze_debug_boxes = true;
-        } else{
+        } else {
             self.shadow_pass.freeze_debug_boxes = false;
         }
 
         if world.debug {
-            self.quad_pass.render(target, &self.shadow_atlas, world.layer);
+            self.quad_pass
+                .render(target, &self.shadow_atlas, world.layer);
         } else {
-            self.forward_pass.render(display, world, &self.shadow_atlas, &self.light_block, &self.light_matrix_block, target);
+            self.forward_pass.render(
+                display,
+                world,
+                &self.shadow_atlas,
+                &self.light_block,
+                &self.light_matrix_block,
+                target,
+            );
         }
         self.debug_pass.render(target, display, world);
 
-
         // self.shadow_pass.draw_debug_light_boxes_solid(target, display, world);
     }
-
 }

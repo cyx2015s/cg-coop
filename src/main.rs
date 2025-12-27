@@ -2,22 +2,18 @@ use std::time::Instant;
 
 use cg_coop::render::SceneRenderer;
 use cg_coop::scene::World;
-use cg_coop::ui::{ UIBuild, UIHandle};
+use cg_coop::ui::{UIBuild, UIHandle};
 
-
-
-use imgui::Condition;
 use glium::winit::event::{DeviceEvent, Event, WindowEvent};
 use glium::*;
+use imgui::Condition;
 fn main() {
-    
-
     let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
 
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
-    .with_title("Project - Mini Blender Mode")
-    .with_inner_size(1200, 900)
-    .build(&event_loop);
+        .with_title("Project - Mini Blender Mode")
+        .with_inner_size(1200, 900)
+        .build(&event_loop);
 
     let mut global_ctx = cg_coop::ui::ctx::GlobalContext::new(&display, &window);
     let mut last_frame = Instant::now();

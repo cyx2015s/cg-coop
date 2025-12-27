@@ -1,6 +1,6 @@
-use crate::scene::world::{ BodyType, GameObject, ShapeKind };
-use imgui::{ Condition, Drag};
+use crate::scene::world::{BodyType, GameObject, ShapeKind};
 use crate::ui::UIBuild;
+use imgui::{Condition, Drag};
 
 impl UIBuild for GameObject {
     fn build_ui(&mut self, ui: &imgui::Ui) {
@@ -12,13 +12,19 @@ impl UIBuild for GameObject {
                 ui.separator();
                 ui.text("变换 (Transform)");
                 let mut pos = self.transform.position.to_array();
-                if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) { self.transform.position = pos.into(); }
+                if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
+                    self.transform.position = pos.into();
+                }
                 let mut scale = self.transform.scale.to_array();
-                if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) { self.transform.scale = scale.into(); }
-                if ui.button("重置旋转") { self.transform.rotation = glam::f32::Quat::IDENTITY; }
+                if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) {
+                    self.transform.scale = scale.into();
+                }
+                if ui.button("重置旋转") {
+                    self.transform.rotation = glam::f32::Quat::IDENTITY;
+                }
 
                 ui.separator();
-                
+
                 let need_regen = self.shape.ui(ui);
                 // match &mut self.kind {
                 //     ShapeKind::Cube { width, height, depth } => {
@@ -89,7 +95,7 @@ impl UIBuild for GameObject {
 
                 //     _ => {}
                 // }
-                
+
                 if need_regen {
                     self.regenerate_mesh();
                 }
@@ -109,7 +115,7 @@ impl UIBuild for GameObject {
                 //             use_texture: self.use_texture,
                 //             selected_vertex_index: None,
                 //         }
-                        
+
                 //     }
                 // }  else {
                 //     ui.text("模型已网格化，只能编辑顶点位置和UV映射。");
@@ -121,34 +127,39 @@ impl UIBuild for GameObject {
                         if Drag::new("X").speed(0.01).build(ui, &mut v[0]) {}
                         if Drag::new("Y").speed(0.01).build(ui, &mut v[1]) {}
                         if Drag::new("Z").speed(0.01).build(ui, &mut v[2]) {}
-                        
+
                         let t = &mut self.mesh.tex_coords[idx];
                         if Drag::new("U").speed(0.01).build(ui, &mut t[0]) {}
                         if Drag::new("V").speed(0.01).build(ui, &mut t[1]) {}
-                    },
+                    }
                     None => {
                         ui.text("未选中顶点");
                     }
                 }
-                
+
                 ui.separator();
                 ui.checkbox("显示/隐藏", &mut self.rendering.visible);
                 ui.checkbox("启用纹理贴图", &mut self.rendering.use_texture);
-                if ui.button("保存当前模型") { let _ = self.mesh.save_obj("output.obj"); }
+                if ui.button("保存当前模型") {
+                    let _ = self.mesh.save_obj("output.obj");
+                }
                 ui.separator();
 
                 ui.text("物理属性(Physics)");
 
                 let is_dynamic = self.physics.body_type == BodyType::Dynamic;
-                if ui.radio_button_bool("自由物体(Dynamic}", is_dynamic){
+                if ui.radio_button_bool("自由物体(Dynamic}", is_dynamic) {
                     self.set_body_type(BodyType::Dynamic);
                 }
-                if ui.radio_button_bool("静态物体(Static)", !is_dynamic){
+                if ui.radio_button_bool("静态物体(Static)", !is_dynamic) {
                     self.set_body_type(BodyType::Static);
                 }
 
                 if self.physics.body_type == BodyType::Dynamic {
-                    Drag::new("弹性系数").speed(0.01).range(0.0, 1.0).build(ui, &mut self.physics.restitution);
+                    Drag::new("弹性系数")
+                        .speed(0.01)
+                        .range(0.0, 1.0)
+                        .build(ui, &mut self.physics.restitution);
                 }
             });
     }

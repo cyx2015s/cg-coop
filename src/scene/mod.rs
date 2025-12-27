@@ -1,4 +1,4 @@
-pub mod light;
 pub mod camera;
+pub mod light;
 pub mod world;
 pub use world::World;

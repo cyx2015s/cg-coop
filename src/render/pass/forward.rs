@@ -1,18 +1,17 @@
-use crate::render::shader::{ create_program, paths };
-use crate::core::vertex::{ Vertex };
+use crate::core::material;
+use crate::core::vertex::Vertex;
+use crate::implement_uniform_block_new;
+use crate::render::scene_renderer::LightSpaceMatrixBlock;
+use crate::render::shader::{create_program, paths};
 use crate::scene::World;
 use crate::scene::light::LightBlock;
-use crate::core::material;
-use crate::render::scene_renderer::LightSpaceMatrixBlock;
-use crate::implement_uniform_block_new;
 
-use glium::Surface;
 use glium::Program;
-use glium::uniforms::UniformBuffer;
-use glium::uniform;
-use std::path::Path;
+use glium::Surface;
 use glium::glutin::surface::WindowSurface;
-
+use glium::uniform;
+use glium::uniforms::UniformBuffer;
+use std::path::Path;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
@@ -31,22 +30,22 @@ pub struct ForwardPass {
     loaded_texture: Option<glium::texture::SrgbTexture2d>,
 }
 
-impl ForwardPass{
+impl ForwardPass {
     pub fn new(
         display: &glium::Display<WindowSurface>,
         light_space_matrix_ubo: UniformBuffer<LightSpaceMatrixBlock>,
         light_block_ubo: UniformBuffer<LightBlock>,
-     ) -> Self {
-        let program = create_program(
-            display,
-            paths::PHONG_VERT,
-            paths::PHONG_FRAG,
-        );
-        let cascade_zfars_block = CascadeZfarsUbo { cascade_zfars: [0.0; 4] };
+    ) -> Self {
+        let program = create_program(display, paths::PHONG_VERT, paths::PHONG_FRAG);
+        let cascade_zfars_block = CascadeZfarsUbo {
+            cascade_zfars: [0.0; 4],
+        };
         let cascade_zfars_ubo = UniformBuffer::new(display, cascade_zfars_block).unwrap();
-        let material_block = material::MaterialBlock { material: material::Material::default() };
+        let material_block = material::MaterialBlock {
+            material: material::Material::default(),
+        };
         let material_ubo = UniformBuffer::new(display, material_block).unwrap();
-                let default_texture = {
+        let default_texture = {
             let size = 64; // 纹理总大小
             let check_size = 8; // 每个格子的大小 (8x8像素)
             let mut data = Vec::with_capacity(size * size * 4);
@@ -63,8 +62,10 @@ impl ForwardPass{
                     data.push(255);
                 }
             }
-            let image =
-                glium::texture::RawImage2d::from_raw_rgba_reversed(&data, (size as u32, size as u32));
+            let image = glium::texture::RawImage2d::from_raw_rgba_reversed(
+                &data,
+                (size as u32, size as u32),
+            );
             glium::texture::SrgbTexture2d::new(display, image).unwrap()
         };
 
@@ -87,8 +88,10 @@ impl ForwardPass{
                         let img = img.flipv();
                         let img = img.to_rgba8();
                         let dims = img.dimensions();
-                        let raw =
-                            glium::texture::RawImage2d::from_raw_rgba_reversed(&img.into_raw(), dims);
+                        let raw = glium::texture::RawImage2d::from_raw_rgba_reversed(
+                            &img.into_raw(),
+                            dims,
+                        );
                         Some(glium::texture::SrgbTexture2d::new(display, raw).unwrap())
                     }
                     Err(e) => {
@@ -112,15 +115,14 @@ impl ForwardPass{
     }
 
     pub fn render(
-        &mut self, 
-        display: &glium::Display<WindowSurface>, 
-        world: &mut World, 
+        &mut self,
+        display: &glium::Display<WindowSurface>,
+        world: &mut World,
         shadow_atlas: &glium::texture::DepthTexture2dArray,
         light_block: &LightBlock,
         light_space_matrix: &LightSpaceMatrixBlock,
         target: &mut glium::Frame,
     ) {
-
         self.light_space_matrix_ubo.write(light_space_matrix);
         self.light_block_ubo.write(light_block);
         if let Some(idx) = world.get_selected_camera() {
@@ -134,9 +136,9 @@ impl ForwardPass{
                 depth: glium::draw_parameters::Depth {
                     test: glium::draw_parameters::DepthTest::IfLess,
                     write: true,
-                    .. Default::default()
+                    ..Default::default()
                 },
-                .. Default::default()
+                ..Default::default()
             };
             let _point_params = glium::draw_parameters::DrawParameters {
                 point_size: Some(5.0),
@@ -150,10 +152,14 @@ impl ForwardPass{
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
 
             for obj in &world.objects {
-                if !obj.rendering.visible { continue; }
+                if !obj.rendering.visible {
+                    continue;
+                }
 
                 let model = obj.transform.get_matrix().to_cols_array_2d();
-                let m_block = material::MaterialBlock { material: obj.rendering.material };
+                let m_block = material::MaterialBlock {
+                    material: obj.rendering.material,
+                };
                 self.material_ubo.write(&m_block);
 
                 let count = obj.mesh.vertices.len();
@@ -169,49 +175,62 @@ impl ForwardPass{
                         normal: obj.mesh.normals[i],
                     });
                 }
-                if vertex_data.is_empty() { continue; }
+                if vertex_data.is_empty() {
+                    continue;
+                }
 
                 let vertices = glium::VertexBuffer::new(display, &vertex_data).unwrap();
 
-                let indices = glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &obj.mesh.indices).unwrap();
+                let indices = glium::IndexBuffer::new(
+                    display,
+                    glium::index::PrimitiveType::TrianglesList,
+                    &obj.mesh.indices,
+                )
+                .unwrap();
 
                 let use_tex = if let Some(tex) = &self.loaded_texture {
                     tex
                 } else {
                     &self.default_texture
                 };
-                let cascade_count:i32 = 3;
-                let splits = crate::render::pass::shadow::ShadowPass::get_cascade_distances(camera_obj.camera.znear, camera_obj.camera.zfar);
-                let mut cascade_zfar_block = CascadeZfarsUbo{ cascade_zfars: [0.0; 4]};
+                let cascade_count: i32 = 3;
+                let splits = crate::render::pass::shadow::ShadowPass::get_cascade_distances(
+                    camera_obj.camera.znear,
+                    camera_obj.camera.zfar,
+                );
+                let mut cascade_zfar_block = CascadeZfarsUbo {
+                    cascade_zfars: [0.0; 4],
+                };
 
-                for i in 0..(cascade_count+1) {
+                for i in 0..(cascade_count + 1) {
                     cascade_zfar_block.cascade_zfars[i as usize] = splits[i as usize];
                 }
-                
-                self.cascade_zfars_ubo.write(&cascade_zfar_block);
-                target.draw(
-                    &vertices,
-                    &indices,
-                    &self.program,
-                    &uniform! { 
-                        model: model, 
-                        view: view, 
-                        perspective: perspective,
-                        viewPos: view_pos,
-                        cascadeCount: cascade_count,
-                        CascadeZfarsUbo : &self.cascade_zfars_ubo,
-                        Material_Block: &self.material_ubo,
-                        Light_Block: &self.light_block_ubo,
-                        diffuse_tex: use_tex, 
-                        has_texture: obj.rendering.use_texture,
-                        // 传入阴影参数
-                        LightSpaceMatrix_Block: &self.light_space_matrix_ubo,
-                        shadow_map: shadow_sampler,
-                    },
-                    &params).unwrap();                
-            }
 
+                self.cascade_zfars_ubo.write(&cascade_zfar_block);
+                target
+                    .draw(
+                        &vertices,
+                        &indices,
+                        &self.program,
+                        &uniform! {
+                            model: model,
+                            view: view,
+                            perspective: perspective,
+                            viewPos: view_pos,
+                            cascadeCount: cascade_count,
+                            CascadeZfarsUbo : &self.cascade_zfars_ubo,
+                            Material_Block: &self.material_ubo,
+                            Light_Block: &self.light_block_ubo,
+                            diffuse_tex: use_tex,
+                            has_texture: obj.rendering.use_texture,
+                            // 传入阴影参数
+                            LightSpaceMatrix_Block: &self.light_space_matrix_ubo,
+                            shadow_map: shadow_sampler,
+                        },
+                        &params,
+                    )
+                    .unwrap();
+            }
         }
     }
 }
-

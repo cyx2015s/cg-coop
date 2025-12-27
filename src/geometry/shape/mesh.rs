@@ -161,7 +161,7 @@ impl Mesh {
         &self.indices
     }
 
-    pub fn get_vertices(&self) -> &[[f32; 3]]  {
+    pub fn get_vertices(&self) -> &[[f32; 3]] {
         &self.vertices
     }
 
@@ -222,7 +222,6 @@ fn compute_smooth_normals(vertices: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3
 
     normals
 }
-
 
 fn compute_closest_point(
     vertices: &[[f32; 3]],
@@ -314,7 +313,8 @@ impl Mesh {
                 let b1 = s1.dot(s) / s1e1;
                 let b2 = s2.dot(direction) / s1e1;
                 if s1e1.abs() > 1e-6 && t >= 0.0 && b1 >= 0.0 && b2 >= 0.0 && (b1 + b2) <= 1.0 {
-                    intersected_face = Some((chunk.try_into().unwrap(), (t * direction + origin).into()));
+                    intersected_face =
+                        Some((chunk.try_into().unwrap(), (t * direction + origin).into()));
                     min_t = t;
                 }
             }
@@ -336,8 +336,10 @@ fn test_compute_intersecting_face() {
         normals: vec![],
         tex_coords: vec![],
         indices: vec![0, 1, 2, 0, 1, 3],
-        aabb: AABB{ min: glam::f32::Vec3::from_array([0.0,0.0,0.0]),
-             max: glam::f32::Vec3::from_array([1.0,1.0,1.0])}
+        aabb: AABB {
+            min: glam::f32::Vec3::from_array([0.0, 0.0, 0.0]),
+            max: glam::f32::Vec3::from_array([1.0, 1.0, 1.0]),
+        },
     };
     let origin = [0.1, 0.1, -1.0];
     let direction = [0.0, 0.0, 1.0];

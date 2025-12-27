@@ -8,4 +8,3 @@ pub trait UIBuild {
 pub trait UIHandle {
     fn handle_ui_input(&mut self, ui: &mut imgui::Ui, display: &glium::Display<WindowSurface>);
 }
-

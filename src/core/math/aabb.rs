@@ -1,25 +1,21 @@
-use std::ops::{ Index };
 use glam::f32::Vec3;
+use std::ops::Index;
 
 #[derive(Debug, Clone, Copy)]
-pub struct AABB{
+pub struct AABB {
     pub min: Vec3,
-    pub max: Vec3
+    pub max: Vec3,
 }
 
-impl AABB{
-
-    pub fn default() -> Self{
-        Self{
+impl AABB {
+    pub fn default() -> Self {
+        Self {
             min: Vec3::INFINITY,
             max: Vec3::NEG_INFINITY,
         }
     }
-    pub fn new(min: Vec3, max: Vec3) -> Self{
-        Self{
-            min,
-            max
-        }
+    pub fn new(min: Vec3, max: Vec3) -> Self {
+        Self { min, max }
     }
 
     pub fn new_from_array(min: [f32; 3], max: [f32; 3]) -> Self {
@@ -32,7 +28,7 @@ impl AABB{
     //     return self.intersect_full(ray, invDir, sign);
     // }
 
-    // pub fn intersect_full(&self, ray: &Ray, invDir: Vec3, sign: Vec3) -> bool{ 
+    // pub fn intersect_full(&self, ray: &Ray, invDir: Vec3, sign: Vec3) -> bool{
     //     let aabb = self;
     //     let o = &ray.o;
     //     let d = &ray.d;
@@ -49,35 +45,37 @@ impl AABB{
 
     //     return tMin < tMax && tMax > 0.0 && tMin < ray.tMax;
     // }
-    pub fn get_half_extents(&self) -> Vec3 { 
+    pub fn get_half_extents(&self) -> Vec3 {
         (self.max - self.min) * 0.5
     }
 
-    pub fn get_global_aabb(&self, model_matrix:glam::f32::Mat4) -> AABB { 
+    pub fn get_global_aabb(&self, model_matrix: glam::f32::Mat4) -> AABB {
         let center = (self.min + self.max) * 0.5;
-        let global_center = (model_matrix * glam::f32::Vec4::from((center,1.0))).truncate();
+        let global_center = (model_matrix * glam::f32::Vec4::from((center, 1.0))).truncate();
         let extents = self.max - center;
 
-        let right   = model_matrix.x_axis.truncate() * extents.x;
-        let up      = model_matrix.y_axis.truncate() * extents.y;
+        let right = model_matrix.x_axis.truncate() * extents.x;
+        let up = model_matrix.y_axis.truncate() * extents.y;
         let forward = model_matrix.z_axis.truncate() * extents.z;
 
-        let new_i = Vec3::X.dot(right).abs()
-            + Vec3::X.dot(up).abs()
-            + Vec3::X.dot(forward).abs();
+        let new_i = Vec3::X.dot(right).abs() + Vec3::X.dot(up).abs() + Vec3::X.dot(forward).abs();
 
-        let new_j = Vec3::Y.dot(right).abs()
-                    + Vec3::Y.dot(up).abs()
-                    + Vec3::Y.dot(forward).abs();
+        let new_j = Vec3::Y.dot(right).abs() + Vec3::Y.dot(up).abs() + Vec3::Y.dot(forward).abs();
 
-        let new_k = Vec3::Z.dot(right).abs()
-                    + Vec3::Z.dot(up).abs()
-                    + Vec3::Z.dot(forward).abs();
+        let new_k = Vec3::Z.dot(right).abs() + Vec3::Z.dot(up).abs() + Vec3::Z.dot(forward).abs();
         let global_aabb = AABB::new_from_array(
-            [global_center.x - new_i, global_center.y - new_j, global_center.z - new_k], 
-            [global_center.x + new_i, global_center.y + new_j, global_center.z + new_k]
+            [
+                global_center.x - new_i,
+                global_center.y - new_j,
+                global_center.z - new_k,
+            ],
+            [
+                global_center.x + new_i,
+                global_center.y + new_j,
+                global_center.z + new_k,
+            ],
         );
-        
+
         return global_aabb;
     }
     pub fn union_point_array(&mut self, v: [f32; 3]) {
@@ -86,8 +84,8 @@ impl AABB{
     }
 
     pub fn union_aabb(&mut self, b: &AABB) {
-         self.min = self.min.min(b.min);
-         self.max = self.max.max(b.max);
+        self.min = self.min.min(b.min);
+        self.max = self.max.max(b.max);
     }
 }
 
@@ -103,8 +101,6 @@ impl Index<usize> for AABB {
     }
 }
 
-
-
 pub fn union_aabb_inplace(dest: &mut AABB, src: &AABB) {
     dest.min = dest.min.min(src.min);
     dest.max = dest.max.max(src.max);
@@ -113,11 +109,9 @@ pub fn union_aabb_inplace(dest: &mut AABB, src: &AABB) {
 pub fn union_aabb_point(a: &AABB, p: Vec3) -> AABB {
     AABB {
         min: Vec3::new(a.min.x.min(p.x), a.min.y.min(p.y), a.min.z.min(p.z)),
-        max: Vec3::new(a.max.x.max(p.x), a.max.y.max(p.y), a.max.z.max(p.z))
+        max: Vec3::new(a.max.x.max(p.x), a.max.y.max(p.y), a.max.z.max(p.z)),
     }
 }
-
-
 
 pub fn union_aabb_point_inplace(dest: &mut AABB, p: Vec3) {
     dest.min = dest.min.min(p);

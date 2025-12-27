@@ -38,7 +38,6 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect: f32) -> Self {
-
         Self {
             transform: transform::Transform::default(),
             fovy: 3.141592 / 3.0,
@@ -59,7 +58,8 @@ impl Camera {
 
     pub fn init(&mut self) {
         self.transform.position = [0.0, 0.0, 10.0].into();
-        self.transform.look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
+        self.transform
+            .look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
         self.rotate(0.0, 0.0);
     }
 
@@ -128,7 +128,6 @@ impl Camera {
     }
 }
 
-
 #[derive(Debug)]
 pub struct MouseState {
     pub is_locked: bool,
@@ -151,12 +150,20 @@ impl MouseState {
         }
     }
 
-    pub fn handle_mouse_move(&mut self, delta: (f64, f64), camera: &mut Camera, window: &glium::winit::window::Window ) {
+    pub fn handle_mouse_move(
+        &mut self,
+        delta: (f64, f64),
+        camera: &mut Camera,
+        window: &glium::winit::window::Window,
+    ) {
         if self.is_locked {
             let (dx, dy) = delta;
-            camera.rotate((-dx as f32) * self.sensitivity, (-dy as f32) * self.sensitivity);
+            camera.rotate(
+                (-dx as f32) * self.sensitivity,
+                (-dy as f32) * self.sensitivity,
+            );
             window.request_redraw();
-        } 
+        }
     }
 
     pub fn toggle_lock(&mut self, window: &glium::winit::window::Window) -> bool {

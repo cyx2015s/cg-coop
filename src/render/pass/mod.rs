@@ -1,10 +1,10 @@
-pub mod shadow;
+pub mod debug;
 pub mod forward;
 pub mod quad;
-pub mod debug;
+pub mod shadow;
 pub mod skybox;
-pub use skybox::SkyboxPass;
 pub use debug::DebugPass;
+pub use forward::ForwardPass;
 pub use quad::QuadPass;
 pub use shadow::ShadowPass;
-pub use forward::ForwardPass;
+pub use skybox::SkyboxPass;

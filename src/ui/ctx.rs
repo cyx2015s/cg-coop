@@ -1,6 +1,6 @@
-use imgui::{ FontConfig, FontGlyphRanges, FontSource};
-use std::time::Instant;
 use glutin::surface::WindowSurface;
+use imgui::{FontConfig, FontGlyphRanges, FontSource};
+use std::time::Instant;
 
 pub struct GlobalContext {
     pub ui_ctx: imgui::Context,
@@ -11,7 +11,10 @@ pub struct GlobalContext {
 }
 
 impl GlobalContext {
-    pub fn new(display :&glium::Display<WindowSurface>, window:& glium::winit::window::Window) -> Self {
+    pub fn new(
+        display: &glium::Display<WindowSurface>,
+        window: &glium::winit::window::Window,
+    ) -> Self {
         let mut ui_ctx = imgui::Context::create();
         let mut ui_renderer = imgui_glium_renderer::Renderer::new(&mut ui_ctx, display).unwrap();
         let mut ui_platform = imgui_winit_support::WinitPlatform::new(&mut ui_ctx);
@@ -44,12 +47,19 @@ impl GlobalContext {
         }
     }
 
-    pub fn handle_event(&mut self, event: &glium::winit::event::Event<()>, window: &glium::winit::window::Window) {
-        self.ui_platform.handle_event(self.ui_ctx.io_mut(), window, event);
+    pub fn handle_event(
+        &mut self,
+        event: &glium::winit::event::Event<()>,
+        window: &glium::winit::window::Window,
+    ) {
+        self.ui_platform
+            .handle_event(self.ui_ctx.io_mut(), window, event);
     }
 
     pub fn update_time(&mut self) {
-        self.ui_ctx.io_mut().update_delta_time(Instant::now() - self.ui_last_frame_time);
+        self.ui_ctx
+            .io_mut()
+            .update_delta_time(Instant::now() - self.ui_last_frame_time);
         self.ui_last_frame_time = Instant::now();
     }
 }
