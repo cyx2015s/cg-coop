@@ -258,6 +258,18 @@ impl UIBuild for World {
                     }
 
                 ui.separator();
+                ui.text("交互物体:");
+                if ui.button("生成门 (按E开关)") {
+                    // 在原点偏左一点生成
+                    self.create_door(glam::vec3(-2.0, 1.0, 0.0));
+                }
+                ui.same_line();
+                if ui.button("生成窗 (按F击碎)") {
+                    // 在原点偏右一点生成
+                    self.create_window(glam::vec3(2.0, 1.5, 0.0));
+                }
+
+                ui.separator();
                 ui.text("场景物体:");
                 for (i, obj) in self.objects.iter().enumerate() {
                     let is_selected = self.selected_index == Some(i);
@@ -328,6 +340,22 @@ impl UIHandle for World {
     fn handle_ui_input(&mut self, ui: &mut imgui::Ui, display: &glium::Display<WindowSurface>) {
         let mut mouse_click_near = None;
         let mut mouse_click_far = None;
+
+        // 先用只读方式获取位置，避免借用冲突
+        let mut interact_pos = None;
+        if let Some(idx) = self.get_selected_camera() {
+            let pos = self.cameras[idx].camera.transform.position;
+            // 检测按键，但不立即调用 handle_interaction_input
+            if ui.is_key_pressed(imgui::Key::E) || ui.is_key_pressed(imgui::Key::F) {
+                interact_pos = Some(pos);
+            }
+        }
+
+        // 现在 safe 地调用交互逻辑 
+        if let Some(pos) = interact_pos {
+            self.handle_interaction_input(pos);
+        }
+
         if let Some(idx) = self.get_selected_camera() {
             let camera = &mut self.cameras[idx].camera;
             let current_time = Instant::now();
