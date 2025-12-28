@@ -47,17 +47,16 @@ fn main() {
                     let mut target = display.draw();
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
                     let ui = global_ctx.ui_ctx.frame();
-                    // ==================== 修改开始：加了大括号 ====================
                     { 
-                        // 1. 获取屏幕尺寸 (顺便修复刚才的解构报错)
+                        // 获取屏幕尺寸
                         let [width, height] = ui.io().display_size;
                         let center_x = width / 2.0;
                         let center_y = height / 2.0;
                         
-                        // 2. 获取画笔
+                        // 获取画笔
                         let draw_list = ui.get_background_draw_list();
                         
-                        // 3. 绘制准星
+                        // 绘制准星
                         let crosshair_size = 10.0;
                         let crosshair_color = [0.0, 1.0, 0.0, 0.8]; 
                         let thickness = 2.0;
@@ -74,8 +73,7 @@ fn main() {
                             crosshair_color,
                         ).thickness(thickness).build();
                         
-                    } // <--- 关键！在这里 draw_list 被销毁，释放了对 ui 的借用
-                    // ==================== 修改结束 ====================
+                    } 
                     let _cn_font = ui.push_font(global_ctx.cn_font);
 
                     ui.show_demo_window(&mut true);

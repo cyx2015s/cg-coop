@@ -1,6 +1,5 @@
 #[macro_export]
 macro_rules! implement_uniform_block_new {
-    // ===================== 无泛型 =====================
     ($struct_name:ident, $($field_name:ident),+ $(,)?) => {
         impl $crate::glium::uniforms::UniformBlock for $struct_name {
 
@@ -12,7 +11,6 @@ macro_rules! implement_uniform_block_new {
                 use $crate::glium::uniforms::LayoutMismatchError;
 
                 if let BlockLayout::Struct { members } = layout {
-                    // layout 中不能有未知字段
                     for (name, _) in members {
                         if $(name != stringify!($field_name) &&)+ true {
                             return Err(LayoutMismatchError::MissingField { name: name.clone() });
@@ -26,7 +24,6 @@ macro_rules! implement_uniform_block_new {
                         <T as $crate::glium::uniforms::UniformBlock>::matches(layout, base_offset)
                     }
 
-                    // 检查每个字段
                     $(
                         let (_, reflected_layout) = members.iter()
                             .find(|(name, _)| name == stringify!($field_name))
