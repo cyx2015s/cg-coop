@@ -1,7 +1,12 @@
 use crate::{
-    core::math::{aabb::AABB, transform::Transform},
-    scene::world::BodyType,
+    core::math::transform::Transform, physics::boundingbox::{AABB, BoundingVolume}, scene::world::BodyType
 };
+
+#[derive(Clone, Copy, Debug)]
+pub struct Contact {
+    pub normal: glam::f32::Vec3,
+    pub penetration: f32,
+}
 
 pub trait RigidBody {
     fn transform(&self) -> &Transform;
@@ -14,11 +19,13 @@ pub trait RigidBody {
 
     fn restitution(&self) -> f32;
 
-    fn aabb(&self) -> AABB;
+    fn bounding_volume(&self) -> BoundingVolume;
 
     fn mass(&self) -> f32;
 
     fn force(&self) -> [f32; 3];
+
+    fn force_mut(&mut self) -> &mut [f32; 3];
 
     fn friction(&self) -> [f32; 3];
 
@@ -42,7 +49,7 @@ pub trait RigidBody {
         }
     }
 
-    fn is_dynamic(&self) -> bool {
+        fn is_dynamic(&self) -> bool {
         self.body_type() == BodyType::Dynamic
     }
 

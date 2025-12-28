@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use crate::core::math::aabb::AABB;
+use crate::physics::boundingbox::{AABB, BoundingVolume};
 use crate::scene::world::EditableMesh;
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct Mesh {
     pub normals: Vec<[f32; 3]>,
     pub tex_coords: Vec<[f32; 2]>,
     pub indices: Vec<u16>,
-    pub aabb: AABB,
+    pub bounding_volume: BoundingVolume,
 }
 
 pub trait AsMesh {
@@ -150,7 +150,7 @@ impl Mesh {
                 normals,
                 tex_coords,
                 indices,
-                aabb,
+                bounding_volume : BoundingVolume::AABB(aabb),
             })
         } else {
             Err("OBJ file contains no models".to_string())
@@ -336,10 +336,10 @@ fn test_compute_intersecting_face() {
         normals: vec![],
         tex_coords: vec![],
         indices: vec![0, 1, 2, 0, 1, 3],
-        aabb: AABB {
+        bounding_volume: BoundingVolume::AABB(AABB{
             min: glam::f32::Vec3::from_array([0.0, 0.0, 0.0]),
             max: glam::f32::Vec3::from_array([1.0, 1.0, 1.0]),
-        },
+        }),
     };
     let origin = [0.1, 0.1, -1.0];
     let direction = [0.0, 0.0, 1.0];

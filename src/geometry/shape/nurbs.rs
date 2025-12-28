@@ -1,7 +1,6 @@
 use imgui::Drag;
-
-use crate::core::math::aabb::AABB;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use crate::physics::boundingbox::{AABB, BoundingVolume};
 use crate::scene::world::EditableMesh;
 
 // B-Spline 基函数
@@ -179,7 +178,7 @@ impl AsMesh for NurbsSurface {
             normals,
             tex_coords,
             indices,
-            aabb,
+            bounding_volume: BoundingVolume::AABB(aabb),
         }
     }
 }

@@ -2,13 +2,14 @@ use super::camera::{Camera, MouseState};
 use super::light::Light;
 
 use crate::core::material::Material;
-use crate::core::math::aabb::AABB;
 use crate::core::math::transform::Transform;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
-use crate::physics::collision::{apply_gravity, predict_position, resolve_collision};
-use crate::physics::rigid::RigidBody;
+use crate::physics::boundingbox::{AABB, BoundingBox, BoundingVolume};
+use crate::physics::collision::board::collide;
+use crate::physics::collision::solve::{apply_gravity, solve_contact};
+use crate::physics::rigid::{Contact, RigidBody};
 
 use glutin::surface::WindowSurface;
 use std::time::Instant;
@@ -99,14 +100,16 @@ impl RigidBody for CameraObject {
     fn velocity_mut(&mut self) -> &mut [f32; 3] { &mut self.camera.physics.velocity }
     fn mass(&self) -> f32 { self.camera.physics.mass }
     fn force(&self) -> [f32; 3] { self.camera.physics.force }
+
+    fn force_mut(&mut self) -> &mut [f32; 3] { &mut self.camera.physics.force }
     fn friction(&self) -> [f32; 3] { self.camera.physics.friction }
     fn body_type(&self) -> BodyType { self.camera.physics.body_type }
     fn restitution(&self) -> f32 { self.camera.physics.restitution }
-    fn aabb(&self) -> AABB {
-        AABB {
+    fn bounding_volume(&self) -> BoundingVolume {
+        BoundingVolume::AABB( AABB {
             min: glam::Vec3::new(-0.25, -0.85, -0.25),
             max: glam::Vec3::new(0.25, 0.85, 0.25),
-        }.get_global_aabb(self.camera.transform.get_matrix())
+        }.get_global_aabb(self.camera.transform.get_matrix()))
     }
 }
 
@@ -118,10 +121,12 @@ impl RigidBody for GameObject {
     fn body_type(&self) -> BodyType { self.physics.body_type }
     fn restitution(&self) -> f32 { self.physics.restitution }
     fn force(&self) -> [f32; 3] { self.physics.force }
+
+    fn force_mut(&mut self) -> &mut [f32; 3] { &mut self.physics.force }
     fn friction(&self) -> [f32; 3] { self.physics.friction }
     fn mass(&self) -> f32 { self.physics.mass }
-    fn aabb(&self) -> AABB {
-        self.mesh.aabb.get_global_aabb(self.transform.get_matrix())
+    fn bounding_volume(&self) -> BoundingVolume {
+        BoundingVolume::AABB(self.mesh.bounding_volume.get_global_aabb(self.transform.get_matrix()))
     }
 }
 
@@ -136,7 +141,7 @@ impl GameObject {
                 normals: vec![],
                 tex_coords: vec![],
                 indices: vec![],
-                aabb: AABB::default(),
+                bounding_volume: BoundingVolume::AABB(AABB::default()),
                 // bvh: None, 
             },
             physics: PhysicalProperties::default(),
@@ -245,7 +250,7 @@ impl World {
             match bodies[i] {
                 BodyHandle::Object(idx) => {
                     let obj = &mut self.objects[idx];
-                    apply_gravity(obj, gravity, dt);
+                    apply_gravity(obj, gravity);
                     obj.update_velocity(dt);
                     // 直接更新位置：新位置 = 旧位置 + 速度 * 时间
                     let vel = glam::f32::Vec3::from(obj.physics.velocity);
@@ -257,7 +262,7 @@ impl World {
                     // 但如果你的相机有飞行模式，这里要注意。这里假设相机也是受重力影响的实体。
                     // 如果是自由漫游模式，通常不由物理引擎控制重力。
                     if cam.camera.move_state == crate::scene::camera::MoveState::RigidBody {
-                        apply_gravity(cam, gravity, dt);
+                        apply_gravity(cam, gravity);
                     }
                     cam.update_velocity(dt);
                     let vel = glam::f32::Vec3::from(cam.camera.physics.velocity);
@@ -272,12 +277,12 @@ impl World {
                 
                 // 获取两个物体的引用
                 let (a, b) = self.get_two_bodies_mut(bodies[i], bodies[j]);
-
+                
                 // 只有当 b 是静态物体时我们才处理碰撞 (简化逻辑，防止物体互挤乱飞)
                 // 如果你想让物体之间也能推着走，可以把这个限制去掉，但 resolving 逻辑会变复杂
-                if !b.is_dynamic() {
-                    resolve_collision(a, b, dt);
-
+                let contact =  collide(&a.bounding_volume(), &b.bounding_volume());
+                if let Some(contact) = contact {
+                    solve_contact(a, b, &contact, dt);
                 }
             }
         }
@@ -497,7 +502,7 @@ impl World {
     pub fn get_scene_bounding_box(&self) -> AABB {
         let mut aabb = AABB::default();
         for obj in &self.objects {
-            aabb.union_aabb(&obj.aabb());
+            aabb.union_bounding_volume(&obj.mesh.bounding_volume);
         }
         aabb
     }

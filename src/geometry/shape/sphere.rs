@@ -1,8 +1,7 @@
 use imgui::Drag;
-
-use crate::core::math::aabb::AABB;
 use crate::geometry::shape::mesh;
 use crate::geometry::shape::mesh::AsMesh;
+use crate::physics::boundingbox::{BoundingVolume, SphereBox};
 use crate::scene::world::EditableMesh;
 pub struct Sphere {
     pub radius: f32,
@@ -12,7 +11,7 @@ pub struct Sphere {
 
 impl AsMesh for Sphere {
     fn as_mesh(&self) -> mesh::Mesh {
-        let aabb = AABB::new_from_array([-self.radius; 3], [self.radius; 3]);
+        let bounding_volume = BoundingVolume::Sphere(SphereBox::new(glam::f32::Vec3::ZERO, self.radius));
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut tex_coords = Vec::new();
@@ -60,7 +59,7 @@ impl AsMesh for Sphere {
             normals,
             tex_coords,
             indices,
-            aabb,
+            bounding_volume,
         }
     }
 }

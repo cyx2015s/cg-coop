@@ -1,13 +1,50 @@
-use glam::f32::Vec3;
-use std::ops::Index;
+use glam::{f32::{ Vec3, Mat4 }};
+use std::{fmt::Debug, ops::Index};
 
-use crate::core::math::ray::Ray;
+use crate::{core::math::{ray::Ray}};
+
+pub trait BoundingBox {
+    fn get_global_aabb(&self, transform: Mat4) -> AABB;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BoundingVolume {
+    AABB(AABB),
+    Sphere(SphereBox),
+}
+
+impl BoundingBox for BoundingVolume { 
+    fn get_global_aabb(&self, transform: Mat4) -> AABB {
+        match self {
+            BoundingVolume::AABB(aabb) => aabb.get_global_aabb(transform),
+            BoundingVolume::Sphere(sphere) => sphere.get_global_aabb(transform),
+        }
+
+    }
+}
+
+
+#[derive(Debug, Clone, Copy)]
+pub struct SphereBox {
+    pub center: Vec3,
+    pub radius: f32,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
 }
+
+impl Default for SphereBox {
+    fn default() -> Self {
+        Self {
+            center: Vec3::ZERO,
+            radius: 0.0,
+        }
+    }
+}
+
 impl Default for AABB {
     fn default() -> Self {
         Self {
@@ -17,15 +54,54 @@ impl Default for AABB {
     }
 }
 
+impl SphereBox {
+    pub fn new(center: Vec3, radius: f32) -> Self {
+        Self { center, radius }
+    }
+    pub fn get_global_aabb(&self, model_matrix: glam::f32::Mat4) -> AABB {
+        let aabb = AABB::from_sphere(self.center, self.radius);
+        aabb.get_global_aabb(model_matrix)
+    }
+
+}
+
+
 impl AABB {
 
-    pub fn new(min: Vec3, max: Vec3) -> Self {
+    pub fn from_vec(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
 
-    pub fn new_from_array(_min_: [f32; 3], max: [f32; 3]) -> Self {
-        Self::new(Vec3::from_array(_min_), Vec3::from_array(max))
+    pub fn from_array(min: [f32; 3], max: [f32; 3]) -> Self {
+        Self{ min:Vec3::from_array(min), max:Vec3::from_array(max),}
     }
+
+    pub fn from_sphere( center: Vec3, radius: f32) -> Self{
+        Self::from_vec(center - radius, center + radius)
+    }
+    
+    pub fn from_cone( radius:f32, height:f32) -> Self{
+        Self::from_array(
+            [-radius, height / 2.0, -radius],
+            [ radius, height / 2.0,  radius],
+        )
+    }
+
+    pub fn from_cube(width: f32, height: f32, depth: f32) -> Self{
+        Self::from_array([-width, -height, -depth], [width, height, depth])
+    }
+
+    pub fn from_cylinder(bottom_radius: f32, top_radius: f32, height: f32) ->Self {
+        let radius = if bottom_radius > top_radius { bottom_radius } else { top_radius };
+        Self::from_array(
+            [-radius, -height / 2.0, -radius],
+            [radius, height / 2.0, radius],
+        )
+    }
+    pub fn center(&self) -> Vec3 {
+        (self.min + self.max) * 0.5
+    }
+
 
     pub fn intersect(&self, ray: &Ray) -> bool {
         let inv_dir = Vec3::new(1.0 / ray.d.x, 1.0 / ray.d.y, 1.0 / ray.d.z);
@@ -70,7 +146,7 @@ impl AABB {
         let new_j = Vec3::Y.dot(right).abs() + Vec3::Y.dot(up).abs() + Vec3::Y.dot(forward).abs();
 
         let new_k = Vec3::Z.dot(right).abs() + Vec3::Z.dot(up).abs() + Vec3::Z.dot(forward).abs();
-        let global_aabb = AABB::new_from_array(
+        let global_aabb = AABB::from_array(
             [
                 global_center.x - new_i,
                 global_center.y - new_j,
@@ -88,6 +164,14 @@ impl AABB {
     pub fn union_point_array(&mut self, v: [f32; 3]) {
         self.min = self.min.min(glam::f32::Vec3::from_array(v));
         self.max = self.max.max(glam::f32::Vec3::from_array(v));
+    }
+
+
+    pub fn union_bounding_volume(&mut self, b: &BoundingVolume) {
+        match b {
+            BoundingVolume::AABB(aabb) => self.union_aabb(aabb),
+            BoundingVolume::Sphere(sphere) => self.union_aabb(&AABB::from_sphere(sphere.center, sphere.radius)),
+        }
     }
 
     pub fn union_aabb(&mut self, b: &AABB) {

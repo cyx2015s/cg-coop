@@ -1,7 +1,6 @@
 use imgui::Drag;
-
-use crate::core::math::aabb::AABB;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
+use crate::physics::boundingbox::{AABB, BoundingVolume};
 use crate::scene::world::EditableMesh;
 use std::f32::consts::PI;
 
@@ -14,10 +13,7 @@ pub struct Cylinder {
 
 impl AsMesh for Cylinder {
     fn as_mesh(&self) -> Mesh {
-        let aabb = AABB::new_from_array(
-            [-self.bottom_radius, -self.height / 2.0, -self.bottom_radius],
-            [self.bottom_radius, self.height / 2.0, self.bottom_radius],
-        );
+        let aabb = AABB::from_cylinder(self.bottom_radius, self.top_radius, self.height);
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut tex_coords = Vec::new();
@@ -116,7 +112,7 @@ impl AsMesh for Cylinder {
             normals,
             tex_coords,
             indices,
-            aabb,
+            bounding_volume: BoundingVolume::AABB(aabb),
         }
     }
 }

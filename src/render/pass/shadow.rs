@@ -1,5 +1,5 @@
-use crate::core::math::aabb::AABB;
 use crate::core::vertex::Vertex;
+use crate::physics::boundingbox::AABB;
 use crate::render::scene_renderer::LightSpaceMatrixBlock;
 use crate::render::shader::{create_program, paths};
 use crate::scene::world::World;
