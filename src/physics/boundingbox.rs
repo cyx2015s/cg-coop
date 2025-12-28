@@ -63,6 +63,10 @@ impl SphereBox {
         aabb.get_global_aabb(model_matrix)
     }
 
+    pub fn get_global_sphere(&self, scale: Vec3, position: Vec3) -> SphereBox { 
+        SphereBox::new(self.center + position, self.radius * scale.x)
+    }
+
 }
 
 

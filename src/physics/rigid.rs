@@ -1,6 +1,8 @@
 use crate::{
-    core::math::transform::Transform, physics::boundingbox::{AABB, BoundingVolume}, scene::world::BodyType
+    core::math::transform::{self, Transform}, physics::boundingbox::{AABB, BoundingVolume}, scene::world::BodyType
 };
+
+use glam::f32::Vec3;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Contact {
@@ -23,33 +25,32 @@ pub trait RigidBody {
 
     fn mass(&self) -> f32;
 
+    fn inv_mass(&self) -> f32 { if self.mass().abs() < 0.0001 { f32::INFINITY } else { 1.0 / self.mass() }  }
+
     fn force(&self) -> [f32; 3];
 
     fn force_mut(&mut self) -> &mut [f32; 3];
 
-    fn friction(&self) -> [f32; 3];
+    fn friction(&self) -> f32;
 
-    fn update_velocity(&mut self, dt: f32) {
+    fn stimulate(&mut self, dt: f32) {
+        if !self.is_dynamic() { return; }
         let mass = self.mass();
-        let force = self.force();
-        let friction = self.friction();
-        let vel = self.velocity_mut();
-        let v_x = vel[0];
-        let v_z = vel[2];
-
-        vel[0] += (force[0] - friction[0] * v_x * mass) / mass * dt;
-        vel[2] += (force[2] - friction[2] * v_z * mass) / mass * dt;
-
-        if force[0].abs() < 0.01 && vel[0].abs() < 0.1 {
-            vel[0] = 0.0;
-        }
-
-        if force[2].abs() < 0.01 && vel[2].abs() < 0.1 {
-            vel[2] = 0.0;
-        }
+        let force = Vec3::from_array(self.force());
+        let mut vel = Vec3::from_array(self.velocity());
+        // 半隐式 Euler：先更新速度，再更新位置
+        let acceleration = force / mass;
+        vel += acceleration * dt;  // 先更新速度
+        self.transform_mut().position += vel * dt; // 再更新位置
+        // 写回速度
+        let velocity = self.velocity_mut();
+        velocity[0] = vel.x;
+        velocity[1] = vel.y;
+        velocity[2] = vel.z;
+        self.force_mut().fill(0.0);
     }
 
-        fn is_dynamic(&self) -> bool {
+    fn is_dynamic(&self) -> bool {
         self.body_type() == BodyType::Dynamic
     }
 

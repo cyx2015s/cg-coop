@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use cg_coop::render::SceneRenderer;
-use cg_coop::scene::World;
+use cg_coop::scene::{World, world};
 use cg_coop::ui::{UIBuild, UIHandle};
 
 use glium::winit::event::{DeviceEvent, Event, WindowEvent};
@@ -47,17 +47,16 @@ fn main() {
                     let mut target = display.draw();
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
                     let ui = global_ctx.ui_ctx.frame();
-                    // ==================== 修改开始：加了大括号 ====================
                     { 
-                        // 1. 获取屏幕尺寸 (顺便修复刚才的解构报错)
+                        // 获取屏幕尺寸
                         let [width, height] = ui.io().display_size;
                         let center_x = width / 2.0;
                         let center_y = height / 2.0;
                         
-                        // 2. 获取画笔
+                        // 获取画笔
                         let draw_list = ui.get_background_draw_list();
                         
-                        // 3. 绘制准星
+                        // 绘制准星
                         let crosshair_size = 10.0;
                         let crosshair_color = [0.0, 1.0, 0.0, 0.8]; 
                         let thickness = 2.0;
@@ -74,8 +73,7 @@ fn main() {
                             crosshair_color,
                         ).thickness(thickness).build();
                         
-                    } // <--- 关键！在这里 draw_list 被销毁，释放了对 ui 的借用
-                    // ==================== 修改结束 ====================
+                    } 
                     let _cn_font = ui.push_font(global_ctx.cn_font);
 
                     ui.show_demo_window(&mut true);
@@ -89,14 +87,19 @@ fn main() {
                     scene.build_ui(ui);
 
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
+
+
+
+                    _cn_font.pop();
                     let now = Instant::now();
-                    let dt = (now - last_frame).as_secs_f32();
+                    let mut dt = (now - last_frame).as_secs_f32();
+                    if dt > 1.0 { dt = 0.0; }
+                    
                     last_frame = now;
+                    scene.handle_ui_input(ui, &display);
                     scene.step(dt);
                     scene_renderer.render(&display, &mut scene,&mut target);
 
-                    _cn_font.pop();
-                    scene.handle_ui_input(ui, &display);
                     let draw_data = global_ctx.ui_ctx.render();
                     if draw_data.draw_lists_count() > 0 {
                         global_ctx.ui_renderer.render(&mut target, draw_data).unwrap();

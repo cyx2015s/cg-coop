@@ -3,6 +3,7 @@ use std::f32;
 use crate::{
     core::math::transform,
     scene::world::{BodyType, PhysicalProperties},
+    geometry::shape::mesh::Mesh,
 };
 
 pub enum MoveState {
@@ -42,10 +43,25 @@ pub struct Camera {
     pub pan_obit_angle: f32,
     pub pan_obit_radius: f32,
     pub pan_obit_center: [f32; 3],
+
+    // 武器系统
+    pub weapon_mesh: Option<Mesh>,
+    pub weapon_transform: transform::Transform,  // 武器相对相机的变换
 }
 
 impl Camera {
     pub fn new(aspect: f32) -> Self {
+        let mut weapon_transform = transform::Transform::default();
+        // 武器位置
+        weapon_transform.position = glam::Vec3::new(0.35, -0.25, -0.6);
+        weapon_transform.scale = glam::Vec3::splat(0.25);  
+        
+        // 武器旋转
+        let rot_x = glam::Quat::from_rotation_x(std::f32::consts::PI);  
+        let rot_y = glam::Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2); 
+        let rot_z = glam::Quat::from_rotation_z(std::f32::consts::PI); 
+        weapon_transform.rotation = rot_y * rot_x * rot_z;
+        
         Self {
             transform: transform::Transform::default(),
             physics: PhysicalProperties::default(),
@@ -55,7 +71,7 @@ impl Camera {
             zfar: 50.0,
             pitch: 0.0,
             yaw: 0.0,
-            force: 9.5,
+            force: 20.0,
             up_velocity: 4.0,
 
             move_state: MoveState::Locked,
@@ -64,6 +80,9 @@ impl Camera {
             pan_obit_angle: 0.0,
             pan_obit_radius: 1.0,
             pan_obit_center: [0.0, 0.0, 0.0],
+
+            weapon_mesh: None,
+            weapon_transform,
         }
     }
 
@@ -71,7 +90,7 @@ impl Camera {
         self.transform.position = [0.0, 0.0, 10.0].into();
         self.transform
             .look_at([0.0, 0.0, 0.0].into(), [0.0, 1.0, 0.0].into());
-        self.physics.friction = [8.0; 3];
+        self.physics.friction = 5.5;
         self.physics.restitution = 0.0;
         self.rotate(0.0, 0.0);
     }
@@ -90,17 +109,19 @@ impl Camera {
 
     pub fn set_dynamic(&mut self) {
         self.physics.body_type = BodyType::Dynamic;
+        self.physics.collision = true;
     }
 
     pub fn set_static(&mut self) {
         self.physics.body_type = BodyType::Static;
+        self.physics.collision = false;
     }
     // 获取视图矩阵
     pub fn get_view_matrix(&self) -> [[f32; 4]; 4] {
         glam::f32::Mat4::look_to_rh(
-            self.transform.position,      // 相机位置
-            self.transform.get_forward(), // 目标点（相机位置 + 前向方向）
-            glam::f32::Vec3::Y,           // 上方向
+            self.transform.position,      
+            self.transform.get_forward(), 
+            glam::f32::Vec3::Y,          
         )
         .to_cols_array_2d()
     }

@@ -15,6 +15,10 @@ impl UIBuild for GameObject {
                 if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
                     self.transform.position = pos.into();
                 }
+                let mut vel = self.physics.velocity;
+                if Drag::new("速度").speed(0.1).build_array(ui, &mut vel) {
+                    self.physics.velocity = vel.into();
+                }
                 let mut scale = self.transform.scale.to_array();
                 if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) {
                     self.transform.scale = scale.into();

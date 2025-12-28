@@ -55,19 +55,17 @@ pub fn look_at_rh(
     look_to_rh(center - eye, up)
 }
 pub fn look_to_rh(dir: glam::f32::Vec3, up: glam::f32::Vec3) -> glam::f32::Quat {
-    let f = dir.normalize(); // forward
-    let u0 = up.normalize(); // original up
+    let f = dir.normalize(); 
+    let u0 = up.normalize(); 
 
-    // 正确：右手系 right = cross(forward, up)
     let r = f.cross(u0).normalize();
 
-    // 修正 up = cross(right, forward)
     let u = r.cross(f);
 
     let rot = glam::f32::Mat3::from_cols(
         r,  // +X
         u,  // +Y
-        -f, // +Z backward for RH camera
+        -f, // +Z 
     );
 
     glam::f32::Quat::from_mat3(&rot)

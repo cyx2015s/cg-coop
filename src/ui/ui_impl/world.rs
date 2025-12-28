@@ -302,8 +302,8 @@ impl UIHandle for World {
                     self.camera_force[3] = ui.is_key_down(imgui::Key::D);
                     self.camera_force[4] = ui.is_key_down(imgui::Key::Space);
                     self.camera_force[5] = ui.is_key_down(imgui::Key::LeftShift);
-                    if ui.is_key_down(imgui::Key::LeftShift) { camera.force = 1.5 * 9.5; }
-                    else { camera.force = 9.5; }
+                    if ui.is_key_down(imgui::Key::LeftShift) { camera.force = 3.0 * 12.0; }
+                    else { camera.force = 12.0; }
                     camera.update_impluse(self.camera_force);
                 } else {
                     camera.set_static();

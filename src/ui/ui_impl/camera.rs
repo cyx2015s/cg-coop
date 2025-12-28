@@ -1,6 +1,6 @@
 use crate::scene::world::CameraObject;
 use crate::ui::UIBuild;
-use imgui::Condition;
+use imgui::{Condition, Drag};
 
 impl UIBuild for CameraObject {
     fn build_ui(&mut self, ui: &imgui::Ui) {
@@ -25,20 +25,19 @@ impl UIBuild for CameraObject {
                     100.0,
                     &mut self.camera.zfar,
                 );
+                let mut pos = self.camera.transform.position.to_array();
+                if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
+                    self.camera.transform.position = pos.into();
+                }
                 ui.slider("force", 1.0, 100.0, &mut self.camera.force);
                 ui.slider("up_vel", 0.0, 100.0, &mut self.camera.up_velocity);
                 ui.slider(
                     "friction_0",
                     0.0,
                     10.0,
-                    &mut self.camera.physics.friction[0],
+                    &mut self.camera.physics.friction,
                 );
-                ui.slider(
-                    "friction_2",
-                    0.0,
-                    10.0,
-                    &mut self.camera.physics.friction[2],
-                );
+
             });
     }
 }
