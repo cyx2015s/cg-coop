@@ -19,7 +19,8 @@ fn main() {
     let mut last_frame = Instant::now();
     let mut scene_renderer = SceneRenderer::new(&display);
     let mut scene = World::new();
-    scene.init_scene_1(&display);
+    // scene.init_aimlab_scene(&display);
+    scene.init_house_scene(&display);
 
     #[allow(deprecated)]
     event_loop.run(move |ev, window_target| {
@@ -31,11 +32,50 @@ fn main() {
                 }
             }
             Event::WindowEvent { event, .. } => match event {
+                // 添加鼠标点击处理
+                WindowEvent::MouseInput { state, button, .. } => {
+                    use glium::winit::event::{ElementState, MouseButton};
+                    if state == ElementState::Pressed && button == MouseButton::Left {
+                        // 只有当鼠标被锁定(在玩游戏)时才触发射击，避免点UI时误触
+                        if scene.mouse_state.is_locked() {
+                            scene.handle_shoot();
+                        }
+                    }
+                },
                 WindowEvent::RedrawRequested => {
                     global_ctx.update_time();
                     let mut target = display.draw();
                     target.clear_color_and_depth((0.05, 0.05, 0.1, 1.0), 1.0);
                     let ui = global_ctx.ui_ctx.frame();
+                    // ==================== 修改开始：加了大括号 ====================
+                    { 
+                        // 1. 获取屏幕尺寸 (顺便修复刚才的解构报错)
+                        let [width, height] = ui.io().display_size;
+                        let center_x = width / 2.0;
+                        let center_y = height / 2.0;
+                        
+                        // 2. 获取画笔
+                        let draw_list = ui.get_background_draw_list();
+                        
+                        // 3. 绘制准星
+                        let crosshair_size = 10.0;
+                        let crosshair_color = [0.0, 1.0, 0.0, 0.8]; 
+                        let thickness = 2.0;
+
+                        draw_list.add_line(
+                            [center_x - crosshair_size, center_y],
+                            [center_x + crosshair_size, center_y],
+                            crosshair_color,
+                        ).thickness(thickness).build();
+
+                        draw_list.add_line(
+                            [center_x, center_y - crosshair_size],
+                            [center_x, center_y + crosshair_size],
+                            crosshair_color,
+                        ).thickness(thickness).build();
+                        
+                    } // <--- 关键！在这里 draw_list 被销毁，释放了对 ui 的借用
+                    // ==================== 修改结束 ====================
                     let _cn_font = ui.push_font(global_ctx.cn_font);
 
                     ui.show_demo_window(&mut true);
