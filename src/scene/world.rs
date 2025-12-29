@@ -14,6 +14,7 @@ use crate::scene::world;
 
 use glutin::surface::WindowSurface;
 use std::default;
+use std::fmt::Debug;
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -183,6 +184,27 @@ impl GameObject {
     }
 }
 
+#[derive(Debug,Clone,Copy)]
+pub struct DebugParams {
+    pub new_object: bool,
+    pub object_list: bool,
+    pub game_object_property: bool,
+    pub camera_property: bool,
+    pub light_property: bool
+}
+
+impl Default for DebugParams {
+    fn default() -> Self {
+        Self {
+            new_object: false,
+            object_list: false,
+            game_object_property: false,
+            camera_property: false,
+            light_property: false,
+        }
+    }
+}
+
 pub struct World {
     pub last_frame_time: Instant,
     pub objects: Vec<GameObject>,
@@ -195,6 +217,7 @@ pub struct World {
     pub default_aspect: f32,
     pub default_mat: Material,
     pub debug: bool,
+    pub debug_params: DebugParams,
     pub debug_frustum: bool,
     pub camera_force: [bool; 6],
     pub layer: usize,
@@ -219,6 +242,7 @@ impl World {
             default_aspect: 16.0 / 9.0,
             default_mat: Material::PHONG,
             debug: false,
+            debug_params: DebugParams::default(),
             debug_frustum: false,
             layer: 0,
             camera_force: [false; 6],

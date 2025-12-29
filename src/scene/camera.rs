@@ -28,6 +28,7 @@ impl PartialEq for MoveState {
 pub struct Camera {
     pub transform: transform::Transform,
     pub physics: PhysicalProperties,
+    pub sensitivity: f32,
     pub fovy: f32,
     pub aspect: f32,
     pub znear: f32,
@@ -67,6 +68,7 @@ impl Camera {
             physics: PhysicalProperties::default(),
             fovy: f32::consts::PI / 3.0,
             aspect,
+            sensitivity: 0.05,
             znear: 0.1,
             zfar: 50.0,
             pitch: 0.0,
@@ -221,10 +223,11 @@ impl MouseState {
         window: &glium::winit::window::Window,
     ) {
         if self.is_locked {
+            let sensitivity = camera.sensitivity;
             let (dx, dy) = delta;
             camera.rotate(
-                (-dx as f32) * self.sensitivity,
-                (-dy as f32) * self.sensitivity,
+                (-dx as f32) * self.sensitivity * sensitivity,
+                (-dy as f32) * self.sensitivity * sensitivity,
             );
             window.request_redraw();
         }

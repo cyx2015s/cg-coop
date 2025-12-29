@@ -14,7 +14,19 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 impl UIBuild for World {
     fn build_ui(&mut self, ui: &imgui::Ui) {
-        ui.window("场景列表 (Scene List)")
+        ui.window("系统窗口")
+            .size([200.0, 400.0], Condition::FirstUseEver)
+            .position([20.0, 150.0], Condition::FirstUseEver)
+            .build(||{
+                ui.checkbox("物体新建窗口", &mut self.debug_params.new_object);
+                ui.checkbox("场景列表", &mut self.debug_params.object_list);
+                ui.checkbox("物体属性窗口", &mut self.debug_params.game_object_property);
+                ui.checkbox("灯光属性窗口", &mut self.debug_params.light_property);
+                ui.checkbox("相机属性窗口", &mut self.debug_params.camera_property);
+            } );
+
+        if self.debug_params.new_object {
+            ui.window("新建物体")
             .size([200.0, 400.0], Condition::FirstUseEver)
             .position([20.0, 150.0], Condition::FirstUseEver)
             .build(|| {
@@ -171,6 +183,15 @@ impl UIBuild for World {
                     self.create_window(glam::vec3(2.0, 1.5, 0.0));
                 }
 
+            });
+        }
+        
+        if self.debug_params.object_list {
+            ui.window("场景列表 (Scene List)")
+            .size([200.0, 400.0], Condition::FirstUseEver)
+            .position([20.0, 150.0], Condition::FirstUseEver)
+            .build(|| {
+                
                 ui.separator();
                 ui.text("场景物体:");
                 for (i, obj) in self.objects.iter().enumerate() {
@@ -209,32 +230,29 @@ impl UIBuild for World {
                     }
                 }
             });
-
-        if let Some(idx) = self.get_selected_camera() {
+        }
+        
+        if self.debug_params.camera_property && let Some(idx) = self.get_selected_camera() {
             let obj = &mut self.cameras[idx];
             obj.build_ui(ui);
         }
 
-        if let Some(obj) = self.get_selected_mut() {
-            obj.build_ui(ui);
-        }
+        if self.debug_params.game_object_property && let Some(obj) = self.get_selected_mut() { obj.build_ui(ui); }
 
-        if let Some(obj) = self.get_selected_light() {
-            obj.build_ui(ui);
-        }
+        if self.debug_params.light_property && let Some(obj) = self.get_selected_light() { obj.build_ui(ui); }
 
-        ui.window("调试操作")
-            .size([200.0, 400.0], Condition::FirstUseEver)
-            .position([20.0, 150.0], Condition::FirstUseEver)
-            .build(|| {
-                let items = [
-                    "layer 0", "layer 1", "layer 2", "layer 3", "layer 4", "layer 5", "layer 6",
-                    "layer 7",
-                ];
-                ui.checkbox("检查阴影贴图", &mut self.debug);
-                ui.combo_simple_string("Layer", &mut self.layer, &items);
-                ui.checkbox("视锥体显示", &mut self.debug_frustum)
-            });
+        // ui.window("调试操作")
+        //     .size([200.0, 400.0], Condition::FirstUseEver)
+        //     .position([20.0, 150.0], Condition::FirstUseEver)
+        //     .build(|| {
+        //         let items = [
+        //             "layer 0", "layer 1", "layer 2", "layer 3", "layer 4", "layer 5", "layer 6",
+        //             "layer 7",
+        //         ];
+        //         ui.checkbox("检查阴影贴图", &mut self.debug);
+        //         ui.combo_simple_string("Layer", &mut self.layer, &items);
+        //         ui.checkbox("视锥体显示", &mut self.debug_frustum)
+        //     });
     }
 }
 

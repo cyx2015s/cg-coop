@@ -1,5 +1,6 @@
 use crate::scene::world::CameraObject;
 use crate::ui::UIBuild;
+use gltf::camera;
 use imgui::{Condition, Drag};
 
 impl UIBuild for CameraObject {
@@ -28,6 +29,10 @@ impl UIBuild for CameraObject {
                 let mut pos = self.camera.transform.position.to_array();
                 if Drag::new("位置").speed(0.1).build_array(ui, &mut pos) {
                     self.camera.transform.position = pos.into();
+                }
+                let mut sensitivity = self.camera.sensitivity;
+                if Drag::new("灵敏度").speed(0.01).build(ui, &mut sensitivity) {
+                    self.camera.sensitivity = sensitivity;
                 }
                 ui.slider("force", 1.0, 100.0, &mut self.camera.force);
                 ui.slider("up_vel", 0.0, 100.0, &mut self.camera.up_velocity);

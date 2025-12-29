@@ -1,7 +1,7 @@
 use glam::{f32::{ Vec3, Mat4 }};
 use std::{fmt::Debug, ops::Index};
 
-use crate::{core::math::{ray::Ray}};
+use crate::core::math::{ray::Ray, transform::Transform};
 
 pub trait BoundingBox {
     fn get_global_aabb(&self, transform: Mat4) -> AABB;
@@ -21,6 +21,13 @@ impl BoundingBox for BoundingVolume {
         }
 
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OBB {
+    pub center: Vec3,
+    pub half_extents: Vec3,
+    pub asxes: [Vec3; 3],
 }
 
 
@@ -53,6 +60,29 @@ impl Default for AABB {
         }
     }
 }
+
+impl Default for OBB {
+    fn default() -> Self {
+        Self {
+            center: Vec3::ZERO,
+            half_extents: Vec3::ZERO,
+            asxes: [Vec3::X, Vec3::Y, Vec3::Z],
+        }
+    }
+}
+
+impl OBB {
+    pub fn from_transform(aabb: &AABB, transform: &Transform) -> Self {
+        let center = transform.position +  (aabb.min + aabb.max) * 0.5;
+        let half_extents = (glam::f32::Mat4::from_scale(transform.scale) * aabb.get_half_extents().extend(1.0)).truncate();
+        let mut asxes = [Vec3::X, Vec3::Y, Vec3::Z];
+        for i in 0..3 { 
+            asxes[i] = transform.rotation * asxes[i];
+        }
+        Self { center, half_extents, asxes }
+    }
+}
+
 
 impl SphereBox {
     pub fn new(center: Vec3, radius: f32) -> Self {
