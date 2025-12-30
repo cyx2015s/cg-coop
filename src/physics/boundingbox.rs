@@ -180,7 +180,9 @@ impl AABB {
         let new_j = Vec3::Y.dot(right).abs() + Vec3::Y.dot(up).abs() + Vec3::Y.dot(forward).abs();
 
         let new_k = Vec3::Z.dot(right).abs() + Vec3::Z.dot(up).abs() + Vec3::Z.dot(forward).abs();
-        let global_aabb = AABB::from_array(
+        
+
+        AABB::from_array(
             [
                 global_center.x - new_i,
                 global_center.y - new_j,
@@ -191,9 +193,7 @@ impl AABB {
                 global_center.y + new_j,
                 global_center.z + new_k,
             ],
-        );
-
-        global_aabb
+        )
     }
     pub fn union_point_array(&mut self, v: [f32; 3]) {
         self.min = self.min.min(glam::f32::Vec3::from_array(v));

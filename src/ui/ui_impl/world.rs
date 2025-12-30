@@ -352,11 +352,7 @@ impl UIHandle for World {
                     self.camera_force[3] = ui.is_key_down(imgui::Key::D);
                     self.camera_force[4] = ui.is_key_down(imgui::Key::Space);
                     self.camera_force[5] = ui.is_key_down(imgui::Key::LeftShift);
-                    if ui.is_key_down(imgui::Key::LeftCtrl) {
-                        camera.is_crouching = true;
-                    } else {
-                        camera.is_crouching = false;
-                    }
+                    camera.is_crouching = ui.is_key_down(imgui::Key::LeftCtrl);
                     if ui.is_key_down(imgui::Key::LeftShift) { camera.force = 3.0 * 12.0; }
                     else { camera.force = 12.0; }
                     camera.update_impluse(self.camera_force);
@@ -437,8 +433,8 @@ impl UIHandle for World {
                 mouse_click_far = Some(world_far);
                 mouse_click_near = Some(world_near);
             }
-            if let Some(origin) = mouse_click_near {
-                if let Some(target) = mouse_click_far {
+            if let Some(origin) = mouse_click_near
+                && let Some(target) = mouse_click_far {
                     let dir = (target - origin).normalize();
                     self.get_selected_mut().map(|obj| {
                         if let Some((pt, costheta)) = obj.mesh.compute_closest_point(origin.to_array(), dir.to_array())
@@ -455,7 +451,6 @@ impl UIHandle for World {
                         }}
                     });
                 }
-            }
         }
     }
 }

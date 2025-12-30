@@ -9,11 +9,10 @@ use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
 use crate::physics::boundingbox::{AABB, BoundingVolume};
 use crate::physics::collision::board::collide;
-use crate::physics::collision::solve::{apply_gravity, solve_contact, stimulate_step};
+use crate::physics::collision::solve::{solve_contact, stimulate_step};
 use crate::physics::rigid::RigidBody;
 
 use glutin::surface::WindowSurface;
-use std::any::Any;
 use std::fmt::Debug;
 use std::time::Instant;
 
@@ -251,6 +250,7 @@ impl GameObject {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[derive(Default)]
 pub struct DebugParams {
     pub new_object: bool,
     pub object_list: bool,
@@ -259,17 +259,6 @@ pub struct DebugParams {
     pub light_property: bool,
 }
 
-impl Default for DebugParams {
-    fn default() -> Self {
-        Self {
-            new_object: false,
-            object_list: false,
-            game_object_property: false,
-            camera_property: false,
-            light_property: false,
-        }
-    }
-}
 
 pub struct World {
     pub last_frame_time: Instant,
@@ -1469,12 +1458,11 @@ impl World {
                 let radius = 0.5 * obj.transform.scale.x;
                 let center = obj.transform.position;
 
-                if let Some(dist) = ray_intersect_sphere(origin, forward, center, radius) {
-                    if dist < min_dist {
+                if let Some(dist) = ray_intersect_sphere(origin, forward, center, radius)
+                    && dist < min_dist {
                         min_dist = dist;
                         hit_idx = Some(i);
                     }
-                }
             }
 
             // 处理命中结果
@@ -1486,11 +1474,10 @@ impl World {
 
                 if self.selected_index == Some(idx) {
                     self.selected_index = None;
-                } else if let Some(sel) = self.selected_index {
-                    if sel > idx {
+                } else if let Some(sel) = self.selected_index
+                    && sel > idx {
                         self.selected_index = Some(sel - 1);
                     }
-                }
 
                 // 生成新靶子
                 // self.spawn_target();

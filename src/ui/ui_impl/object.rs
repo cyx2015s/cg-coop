@@ -1,8 +1,6 @@
-use std::any::{Any, TypeId};
 
 use crate::scene::world::{BodyType, EditableMesh, GameObject};
 use crate::ui::UIBuild;
-use gltf::Mesh;
 use imgui::{Condition, Drag};
 
 impl UIBuild for GameObject {
@@ -20,7 +18,7 @@ impl UIBuild for GameObject {
                 }
                 let mut vel = self.physics.velocity;
                 if Drag::new("速度").speed(0.1).build_array(ui, &mut vel) {
-                    self.physics.velocity = vel.into();
+                    self.physics.velocity = vel;
                 }
                 let mut scale = self.transform.scale.to_array();
                 if Drag::new("缩放").speed(0.01).build_array(ui, &mut scale) {
@@ -50,7 +48,7 @@ impl UIBuild for GameObject {
                         rendering: self.rendering.clone(),
                         physics: self.physics.clone(),
                         transform: self.transform.clone(),
-                        behavior: self.behavior.clone(),
+                        behavior: self.behavior,
                     };
                 }
 

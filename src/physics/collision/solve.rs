@@ -1,4 +1,4 @@
-use crate::{physics::rigid::{Contact, RigidBody}, scene::{World, world::{self, BodyHandle}}};
+use crate::{physics::rigid::{Contact, RigidBody}, scene::{World, world::BodyHandle}};
 
 
 use glam::f32::Vec3;
@@ -73,7 +73,7 @@ pub fn apply_gravity(obj: &mut dyn RigidBody, gravity: [f32; 3]) {
     let mass = obj.mass();
     if obj.is_dynamic() {
         let force = obj.force_mut();
-        force[1] = force[1] + gravity[1] * mass;
+        force[1] += gravity[1] * mass;
     }
 }
 

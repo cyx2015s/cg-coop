@@ -1,5 +1,5 @@
 use crate::{
-    core::math::transform::{self, Transform}, physics::boundingbox::{AABB, BoundingVolume}, scene::world::BodyType
+    core::math::transform::Transform, physics::boundingbox::BoundingVolume, scene::world::BodyType
 };
 
 use glam::f32::Vec3;

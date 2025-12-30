@@ -1,12 +1,11 @@
 use std::time::Instant;
 
 use cg_coop::render::SceneRenderer;
-use cg_coop::scene::{World, world};
+use cg_coop::scene::World;
 use cg_coop::ui::{UIBuild, UIHandle};
 
 use glium::winit::event::{DeviceEvent, Event, WindowEvent};
 use glium::*;
-use imgui::Condition;
 fn main() {
     let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
 

@@ -1,5 +1,3 @@
-use glium::buffer::Content;
-use glium::uniforms::Uniforms;
 use glium::{Program, Surface, uniform};
 use glutin::surface::WindowSurface;
 
@@ -58,7 +56,7 @@ impl DebugPass {
                 target
                     .draw(
                         &debug_vbo,
-                        &glium::index::NoIndices(glium::index::PrimitiveType::Points),
+                        glium::index::NoIndices(glium::index::PrimitiveType::Points),
                         &self.program,
                         &uniforms,
                         &params,
@@ -95,7 +93,7 @@ impl DebugPass {
                 target
                     .draw(
                         &debug_vbo,
-                        &glium::index::NoIndices(glium::index::PrimitiveType::Points),
+                        glium::index::NoIndices(glium::index::PrimitiveType::Points),
                         &self.program,
                         &uniforms,
                         &params,
