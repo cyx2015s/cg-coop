@@ -1,7 +1,8 @@
 use crate::core::vertex::Vertex;
 use crate::physics::boundingbox::AABB;
-use crate::render::scene_renderer::LightSpaceMatrixBlock;
+use crate::render::scene_renderer::{LightSpaceMatrixBlock, PointLightSpaceMatrixBlock, SpotLightSpaceMatrixBlock};
 use crate::render::shader::{create_program, paths};
+use crate::scene::light::Light;
 use crate::scene::world::World;
 
 use glium::Program;
@@ -24,6 +25,8 @@ pub struct DebugLightBox {
 
 pub struct ShadowPass {
     pub shadow_pass_program: Program,
+    pub spot_shadow_pass_program: Program,
+    pub point_shadow_pass_program: Program,
     pub debug_program: Program,
     pub debug_light_boxes: Vec<DebugLightBox>,
     pub freeze_debug_boxes: bool,
@@ -37,8 +40,21 @@ impl ShadowPass {
             "assets/shaders/debug.vert",
             "assets/shaders/debug.frag",
         );
+        let spot_shadow_pass_program = create_program(
+            display,
+            "assets/shaders/spotshadow.vert",
+            "assets/shaders/spotshadow.frag",
+        );
+        let point_shadow_pass_program = create_program(
+            display,
+            "assets/shaders/pointshadow.vert",
+            "assets/shaders/pointshadow.frag",
+        );
+
         Self {
             shadow_pass_program,
+            spot_shadow_pass_program,
+            point_shadow_pass_program,
             debug_program,
             debug_light_boxes: Vec::new(),
             freeze_debug_boxes: false,
@@ -63,6 +79,35 @@ impl ShadowPass {
     // =========================
     // Main update
     // =========================
+
+    pub fn update_spot_light_space_matrix(
+        &mut self,
+        light_space_block: &mut SpotLightSpaceMatrixBlock,
+        scene: &World,
+    ) {
+        for (light_index, light_object) in scene.lights.iter().enumerate() {
+            if !light_object.light.is_spot() {
+                continue;
+            }
+            light_space_block.spot_light_space_matrix[light_index].matrix = light_object.light.get_spot_light_space_matrix();
+        }
+    }
+
+    pub fn update_point_light_space_matrix(
+        &mut self,
+        light_space_block: &mut PointLightSpaceMatrixBlock,
+        scene: &World,
+    ) {
+        for (light_index, light_object) in scene.lights.iter().enumerate() {
+            if !light_object.light.is_point() {
+                continue;
+            }
+            for i in 0..6 {
+                light_space_block.point_light_space_matrix[light_index * 6 + i].matrix = light_object.light.get_point_light_space_matrix(i);
+            }
+        }
+    }
+
     pub fn update_directional_light_space_matrix(
         &mut self,
         light_space_ubo: &mut LightSpaceMatrixBlock,
@@ -285,30 +330,180 @@ impl ShadowPass {
 
     pub fn render(
         &mut self,
-        shadow_atlas: &mut DepthTexture2dArray,
+        directional_shadow_atlas: &mut DepthTexture2dArray,
+        spot_shadow_atlas: &mut DepthTexture2dArray,
+        point_shdaow_atlas: &mut DepthTexture2dArray,
         light_space_matrix: &mut LightSpaceMatrixBlock,
+        spot_light_matrix: &mut SpotLightSpaceMatrixBlock,
+        point_light_matrix: &mut PointLightSpaceMatrixBlock,
         display: &glium::Display<WindowSurface>,
         scene: &World,
     ) {
         self.update_directional_light_space_matrix(light_space_matrix, scene);
+        self.update_spot_light_space_matrix(spot_light_matrix, scene);
+        self.update_point_light_space_matrix(point_light_matrix, scene);
         for (light_index, light_object) in scene.lights.iter().enumerate() {
-            if !light_object.light.is_directional() {
-                for cascade in 0..CASCADE_COUNT {
-                    let layer = (light_index * CASCADE_COUNT + cascade) as u32;
-                    let depth_layer = shadow_atlas.main_level().layer(layer).unwrap();
-
-                    let mut target =
-                        glium::framebuffer::SimpleFrameBuffer::depth_only(display, depth_layer)
-                            .unwrap();
-                    target.clear_depth(1.0);
+            if light_object.light.is_spot() {
+                self.render_spot_layer(spot_shadow_atlas, spot_light_matrix, &light_object.light,display, light_index as u32, scene);
+            }
+            if light_object.light.is_point() {
+                for i in 0..6 {
+                    let layer = (light_index * 6 + i) as u32;
+                    self.render_point_layer(point_shdaow_atlas, point_light_matrix, &light_object.light, display, layer, scene);
                 }
             }
-            for cascade in 0..CASCADE_COUNT {
-                let layer = (light_index * CASCADE_COUNT + cascade) as u32;
-                self.render_layer(shadow_atlas, light_space_matrix, display, layer, scene);
+            if light_object.light.is_directional() {
+                for cascade in 0..CASCADE_COUNT {
+                    let layer = (light_index * CASCADE_COUNT + cascade) as u32;
+                    self.render_layer(directional_shadow_atlas, light_space_matrix, display, layer, scene);
+                }
             }
+
         }
     }
+
+    fn render_point_layer(
+        &self,
+        shadow_atlas: &mut DepthTexture2dArray,
+        light_matrix_block: &mut PointLightSpaceMatrixBlock,
+        light: &Light,
+        display: &glium::Display<WindowSurface>,
+        layer: u32,
+        scene: &World,
+    ) {
+        // 获取纹理数组的特定层
+        let depth_layer = shadow_atlas.main_level().layer(layer).unwrap();
+
+        let mut target =
+            glium::framebuffer::SimpleFrameBuffer::depth_only(display, depth_layer).unwrap();
+        target.clear_depth(1.0);
+
+        let params = glium::draw_parameters::DrawParameters {
+            depth: glium::Depth {
+                test: glium::draw_parameters::DepthTest::IfLess,
+                write: true,
+                ..Default::default()
+            },
+            color_mask: (false, false, false, false),
+            ..Default::default()
+        };
+
+        // 渲染所有网格
+        for obj in &scene.objects {
+            if !obj.rendering.visible {
+                continue;
+            }
+
+            let vertices: Vec<Vertex> = obj
+                .mesh
+                .vertices
+                .iter()
+                .zip(obj.mesh.tex_coords.iter())
+                .map(|(v, t)| Vertex {
+                    position: *v,
+                    tex_coord: *t,
+                    normal: [0.0, 0.0, 0.0],
+                })
+                .collect();
+
+            if vertices.is_empty() {
+                continue;
+            }
+
+            let vbo = glium::VertexBuffer::new(display, &vertices).unwrap();
+            let ibo = glium::IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &obj.mesh.indices,
+            )
+            .unwrap();
+
+            let model = obj.transform.get_matrix().to_cols_array_2d();
+
+            let uniforms = uniform! {
+                model: model,
+                lightVP: light_matrix_block.point_light_space_matrix[layer as usize].matrix,
+                lightPos: light.position,
+                range: light.range
+            };
+
+            target
+                .draw(&vbo, &ibo, &self.point_shadow_pass_program, &uniforms, &params)
+                .unwrap();
+        }
+    }
+    
+    fn render_spot_layer(
+        &self,
+        shadow_atlas: &mut DepthTexture2dArray,
+        light_matrix_block: &mut SpotLightSpaceMatrixBlock,
+        light: &Light,
+        display: &glium::Display<WindowSurface>,
+        layer: u32,
+        scene: &World,
+    ) {
+        // 获取纹理数组的特定层
+        let depth_layer = shadow_atlas.main_level().layer(layer).unwrap();
+
+        let mut target =
+            glium::framebuffer::SimpleFrameBuffer::depth_only(display, depth_layer).unwrap();
+        target.clear_depth(1.0);
+
+        let params = glium::draw_parameters::DrawParameters {
+            depth: glium::Depth {
+                test: glium::draw_parameters::DepthTest::IfLess,
+                write: true,
+                ..Default::default()
+            },
+            color_mask: (false, false, false, false),
+            ..Default::default()
+        };
+
+        // 渲染所有网格
+        for obj in &scene.objects {
+            if !obj.rendering.visible {
+                continue;
+            }
+
+            let vertices: Vec<Vertex> = obj
+                .mesh
+                .vertices
+                .iter()
+                .zip(obj.mesh.tex_coords.iter())
+                .map(|(v, t)| Vertex {
+                    position: *v,
+                    tex_coord: *t,
+                    normal: [0.0, 0.0, 0.0],
+                })
+                .collect();
+
+            if vertices.is_empty() {
+                continue;
+            }
+
+            let vbo = glium::VertexBuffer::new(display, &vertices).unwrap();
+            let ibo = glium::IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &obj.mesh.indices,
+            )
+            .unwrap();
+
+            let model = obj.transform.get_matrix().to_cols_array_2d();
+
+            let uniforms = uniform! {
+                model: model,
+                lightSpaceMatrix: light_matrix_block.spot_light_space_matrix[layer as usize].matrix,
+                lightPosition: light.position,
+                range: light.range
+            };
+
+            target
+                .draw(&vbo, &ibo, &self.spot_shadow_pass_program, &uniforms, &params)
+                .unwrap();
+        }
+    }
+    
     fn render_layer(
         &self,
         shadow_atlas: &mut DepthTexture2dArray,

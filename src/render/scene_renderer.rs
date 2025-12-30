@@ -23,12 +23,30 @@ pub struct LightSpaceMatrixBlock {
     pub light_space_matrix: [LightSpaceMatrix; 128],
 }
 
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct SpotLightSpaceMatrixBlock {
+    pub spot_light_space_matrix: [LightSpaceMatrix; 32],
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct PointLightSpaceMatrixBlock {
+    pub point_light_space_matrix: [LightSpaceMatrix; 256],
+}
+
 implement_uniform_block_new!(LightSpaceMatrix, matrix);
 implement_uniform_block_new!(LightSpaceMatrixBlock, light_space_matrix);
+implement_uniform_block_new!(SpotLightSpaceMatrixBlock, spot_light_space_matrix);
+implement_uniform_block_new!(PointLightSpaceMatrixBlock, point_light_space_matrix);
 
 pub struct SceneRenderer {
     pub shadow_atlas: DepthTexture2dArray,
+    pub spot_shadow_atlas: DepthTexture2dArray,
+    pub point_shadow_atlas: DepthTexture2dArray,
     pub light_matrix_block: LightSpaceMatrixBlock,
+    pub spot_light_matrix_block: SpotLightSpaceMatrixBlock,
+    pub point_light_matrix_block: PointLightSpaceMatrixBlock,
     pub light_block: LightBlock,
     pub shadow_pass: ShadowPass,
     pub forward_pass: ForwardPass,
@@ -46,7 +64,25 @@ impl SceneRenderer {
             glium::texture::MipmapsOption::NoMipmap,
             SHADOW_SIZE,
             SHADOW_SIZE,
-            128_u32,
+            96_u32,
+        )
+        .unwrap();
+        let spot_shadow_atlas = DepthTexture2dArray::empty_with_format(
+            display,
+            glium::texture::DepthFormat::F32,
+            glium::texture::MipmapsOption::NoMipmap,
+            SHADOW_SIZE,
+            SHADOW_SIZE,
+            32_u32,
+        )
+        .unwrap();
+        let point_shadow_atlas = DepthTexture2dArray::empty_with_format(
+            display,
+            glium::texture::DepthFormat::F32,
+            glium::texture::MipmapsOption::NoMipmap,
+            SHADOW_SIZE,
+            SHADOW_SIZE,
+            196_u32,
         )
         .unwrap();
 
@@ -55,23 +91,41 @@ impl SceneRenderer {
                 matrix: [[0.0; 4]; 4],
             }; 128],
         };
+        let spot_light_matrix_block = SpotLightSpaceMatrixBlock {
+            spot_light_space_matrix: [LightSpaceMatrix {
+                matrix: [[0.0; 4]; 4],
+            }; 32],
+        };
+
+        let point_light_matrix_block = PointLightSpaceMatrixBlock {
+            point_light_space_matrix: [LightSpaceMatrix {
+                matrix: [[0.0; 4]; 4],
+            }; 256],
+        };
 
         let light_space_matrix_ubo =
             glium::uniforms::UniformBuffer::new(display, light_matrix_block).unwrap();
-
+        let spot_light_space_matrix_ubo =
+            glium::uniforms::UniformBuffer::new(display, spot_light_matrix_block).unwrap();
+        let point_light_space_matrix_ubo =
+            glium::uniforms::UniformBuffer::new(display, point_light_matrix_block).unwrap();
         let light_block = LightBlock {
             lights: [Light::NONE; 32],
             num_lights: 0,
         };
 
         let light_block_ubo = glium::uniforms::UniformBuffer::new(display, light_block).unwrap();
-
+       
         Self {
             shadow_atlas,
+            spot_shadow_atlas,
+            point_shadow_atlas,
             light_matrix_block,
+            spot_light_matrix_block,
+            point_light_matrix_block,
             light_block,
             shadow_pass: ShadowPass::new(display),
-            forward_pass: ForwardPass::new(display, light_space_matrix_ubo, light_block_ubo),
+            forward_pass: ForwardPass::new(display, light_space_matrix_ubo, spot_light_space_matrix_ubo, point_light_space_matrix_ubo, light_block_ubo),
             quad_pass: QuadPass::new(display),
             debug_pass: DebugPass::new(display),
             skybox_pass: SkyboxPass::new(display),
@@ -94,7 +148,11 @@ impl SceneRenderer {
 
         self.shadow_pass.render(
             &mut self.shadow_atlas,
+            &mut self.spot_shadow_atlas,
+            &mut self.point_shadow_atlas,
             &mut self.light_matrix_block,
+            &mut self.spot_light_matrix_block,
+            &mut self.point_light_matrix_block,
             display,
             world,
         );
@@ -114,8 +172,12 @@ impl SceneRenderer {
                 display,
                 world,
                 &self.shadow_atlas,
+                &self.spot_shadow_atlas,
+                &self.point_shadow_atlas,
                 &self.light_block,
                 &self.light_matrix_block,
+                &self.spot_light_matrix_block,
+                &self.point_light_matrix_block,
                 target,
             );
         }

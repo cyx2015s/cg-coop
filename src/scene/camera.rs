@@ -37,6 +37,10 @@ pub struct Camera {
     pub yaw: f32,
     pub force: f32,
     pub up_velocity: f32,
+    pub stand_half_height: f32,   // 0.85
+    pub crouch_half_height: f32,  // 0.45
+    pub current_half_height: f32, // 实际使用
+    pub is_crouching: bool,
 
     pub move_state: MoveState,
     pub pan_obit_speed: f32,
@@ -75,6 +79,10 @@ impl Camera {
             yaw: 0.0,
             force: 20.0,
             up_velocity: 4.0,
+            stand_half_height: 0.85,   // 0.85
+            crouch_half_height: 0.45,  // 0.45
+            current_half_height: 0.85, // 实际使用
+            is_crouching: false,
 
             move_state: MoveState::Locked,
             pan_obit_speed: 1.0,

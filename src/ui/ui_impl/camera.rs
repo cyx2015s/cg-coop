@@ -1,6 +1,5 @@
 use crate::scene::world::CameraObject;
 use crate::ui::UIBuild;
-use gltf::camera;
 use imgui::{Condition, Drag};
 
 impl UIBuild for CameraObject {

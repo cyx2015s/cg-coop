@@ -1,7 +1,7 @@
 use crate::core::material;
 use crate::core::vertex::Vertex;
 use crate::implement_uniform_block_new;
-use crate::render::scene_renderer::LightSpaceMatrixBlock;
+use crate::render::scene_renderer::{LightSpaceMatrixBlock, PointLightSpaceMatrixBlock, SpotLightSpaceMatrixBlock};
 use crate::render::shader::{create_program, paths};
 use crate::scene::World;
 use crate::scene::light::LightBlock;
@@ -23,6 +23,8 @@ implement_uniform_block_new!(CascadeZfarsUbo, cascade_zfars);
 pub struct ForwardPass {
     program: Program,
     light_space_matrix_ubo: UniformBuffer<LightSpaceMatrixBlock>,
+    spot_space_matrix_ubo: UniformBuffer<SpotLightSpaceMatrixBlock>,
+    point_space_matrix_ubo: UniformBuffer<PointLightSpaceMatrixBlock>,
     light_block_ubo: UniformBuffer<LightBlock>,
     material_ubo: UniformBuffer<material::MaterialBlock>,
     cascade_zfars_ubo: UniformBuffer<CascadeZfarsUbo>,
@@ -34,6 +36,8 @@ impl ForwardPass {
     pub fn new(
         display: &glium::Display<WindowSurface>,
         light_space_matrix_ubo: UniformBuffer<LightSpaceMatrixBlock>,
+        spot_space_matrix_ubo: UniformBuffer<SpotLightSpaceMatrixBlock>,
+        point_space_matrix_ubo: UniformBuffer<PointLightSpaceMatrixBlock>,
         light_block_ubo: UniformBuffer<LightBlock>,
     ) -> Self {
         let program = create_program(display, paths::PHONG_VERT, paths::PHONG_FRAG);
@@ -106,6 +110,8 @@ impl ForwardPass {
         Self {
             program,
             light_space_matrix_ubo,
+            spot_space_matrix_ubo,
+            point_space_matrix_ubo,
             light_block_ubo,
             material_ubo,
             cascade_zfars_ubo,
@@ -119,11 +125,17 @@ impl ForwardPass {
         display: &glium::Display<WindowSurface>,
         world: &mut World,
         shadow_atlas: &glium::texture::DepthTexture2dArray,
+        spot_shadow_atlas: &glium::texture::DepthTexture2dArray,
+        point_shadow_atlas: &glium::texture::DepthTexture2dArray,
         light_block: &LightBlock,
         light_space_matrix: &LightSpaceMatrixBlock,
+        spot_light_space_matrix: &SpotLightSpaceMatrixBlock,
+        point_light_space_matrix: &PointLightSpaceMatrixBlock,
         target: &mut glium::Frame,
     ) {
         self.light_space_matrix_ubo.write(light_space_matrix);
+        self.spot_space_matrix_ubo.write(spot_light_space_matrix);
+        self.point_space_matrix_ubo.write(point_light_space_matrix);
         self.light_block_ubo.write(light_block);
         if let Some(idx) = world.get_selected_camera() {
             let camera_obj = &mut world.cameras[idx];
@@ -150,7 +162,14 @@ impl ForwardPass {
                 .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
                 .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest)
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
-
+            let spot_shadow_sampler = glium::uniforms::Sampler::new(spot_shadow_atlas)
+                .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+                .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest)
+                .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
+            let point_shadow_sampler = glium::uniforms::Sampler::new(point_shadow_atlas)
+                .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+                .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest)
+                .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
             for obj in &world.objects {
                 if !obj.rendering.visible {
                     continue;
@@ -225,7 +244,11 @@ impl ForwardPass {
                             has_texture: obj.rendering.use_texture,
                             // 传入阴影参数
                             LightSpaceMatrix_Block: &self.light_space_matrix_ubo,
+                            SpotLightMatrix_Block: &self.spot_space_matrix_ubo,
+                            PointLightMatrix_Block: &self.point_space_matrix_ubo,
                             shadow_map: shadow_sampler,
+                            spot_shadow_map: spot_shadow_sampler,
+                            point_shadow_map: point_shadow_sampler,
                         },
                         &params,
                     )

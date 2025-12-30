@@ -4,7 +4,7 @@ use crate::geometry::shape::cylinder::Cylinder;
 use crate::geometry::shape::mesh::Mesh;
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::sphere::Sphere;
-use crate::scene::camera;
+use crate::scene::camera::{self, MoveState};
 use crate::scene::world::{GameObject, World};
 use crate::ui::{UIBuild, UIHandle};
 use imgui::Condition;
@@ -232,9 +232,41 @@ impl UIBuild for World {
             });
         }
         
-        if self.debug_params.camera_property && let Some(idx) = self.get_selected_camera() {
+        if let Some(idx) = self.get_selected_camera() {
             let obj = &mut self.cameras[idx];
-            obj.build_ui(ui);
+            match obj.camera.move_state{
+                MoveState::Free => {
+                    ui.window("飞行模式说明")
+                        .size([300.0, 400.0], Condition::Appearing)
+                        .build(|| {
+                            ui.text_wrapped("按K切换到实体\n按V键进入编辑模式\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降\n");
+                            });
+                }
+                MoveState::Locked =>{
+                    ui.window("编辑模式说明")
+                        .size([300.0, 100.0], Condition::FirstUseEver)
+                        .build(|| {
+                            ui.text_wrapped("按K切换到实体模式\n按V进入飞行模式\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图");
+                        });
+                }
+                MoveState::PanObit => {
+                    ui.window("编辑模式说明")
+                        .size([300.0, 300.0], Condition::Appearing)
+                        .build(|| {
+                            ui.text_wrapped("按K切换到实体模式\n按V进入飞行模式\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图");
+                        });
+                }
+                MoveState::RigidBody =>{
+                    ui.window("实体模式说明")
+                        .size([300.0, 500.0], Condition::Appearing)
+                        .build(|| {
+                            ui.text_wrapped("按K切换到编辑模式\n按V键进入飞行模式\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS前后移动\n按AD左右移动\n按Space跳跃\n按住左Shift加速\n按Ctrl蹲下\n");  
+                    
+                
+                        });
+                }
+            }
+            if self.debug_params.camera_property { obj.build_ui(ui); }
         }
 
         if self.debug_params.game_object_property && let Some(obj) = self.get_selected_mut() { obj.build_ui(ui); }
@@ -320,6 +352,11 @@ impl UIHandle for World {
                     self.camera_force[3] = ui.is_key_down(imgui::Key::D);
                     self.camera_force[4] = ui.is_key_down(imgui::Key::Space);
                     self.camera_force[5] = ui.is_key_down(imgui::Key::LeftShift);
+                    if ui.is_key_down(imgui::Key::LeftCtrl) {
+                        camera.is_crouching = true;
+                    } else {
+                        camera.is_crouching = false;
+                    }
                     if ui.is_key_down(imgui::Key::LeftShift) { camera.force = 3.0 * 12.0; }
                     else { camera.force = 12.0; }
                     camera.update_impluse(self.camera_force);

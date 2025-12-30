@@ -1,4 +1,4 @@
-use crate::implement_uniform_block_new;
+use crate::{core::math::transform::look_to_rh, implement_uniform_block_new};
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
@@ -68,7 +68,7 @@ impl Light {
         position: [0.0, 0.0, 0.0],
         angle: 0.0,
         direction: [0.0, -1.0, 0.0],
-        range: 0.0,
+        range: 40.0,
         kfactor: [1.0, 0.09, 0.032],
         light_type: 2,
     };
@@ -77,7 +77,7 @@ impl Light {
         color: [1.0, 1.0, 1.0],
         intensity: 1.0,
         position: [0.0, 0.0, 0.0],
-        angle: 12.5,
+        angle: 25.0 / 180.0,
         direction: [0.0, -1.0, 0.0],
         range: 10.0,
         kfactor: [1.0, 0.09, 0.032],
@@ -92,6 +92,34 @@ impl Light {
         light_space_matrix.to_cols_array_2d()
     }
 
+    pub fn get_spot_light_space_matrix(&self) -> [[f32; 4]; 4] {
+        let light_dir = glam::Vec3::from(self.direction).normalize();
+        let light_pos = glam::f32::Vec3::from_array(self.position);
+        
+        let mut light_view = glam::Mat4::look_to_rh(light_pos, light_dir, glam::f32::Vec3::Y);
+        if light_dir.x.abs() < 0.01 && light_dir.z.abs() < 0.01 {
+            light_view = glam::Mat4::look_to_rh(light_pos, light_dir, glam::f32::Vec3::X);
+        }
+        let light_projection =
+            glam::f32::Mat4::perspective_rh_gl(self.angle * 2.0, 1.0, 0.5, self.range);
+
+        (light_projection * light_view).to_cols_array_2d()
+    }
+
+    pub fn get_point_light_space_matrix(&self, index: usize) -> [[f32; 4]; 4] {
+        let light_pos = glam::f32::Vec3::from_array(self.position);
+        let mut view = glam::Mat4::look_to_rh(light_pos, face_direction(index),glam::f32::Vec3::Y);
+        if index == 2 || index == 3 {
+            view = glam::Mat4::look_to_rh(light_pos, face_direction(index), glam::f32::Vec3::Z);
+        }
+        let angle: f32 = 90.0;
+        let light_projection = 
+        glam::f32::Mat4::perspective_rh_gl(angle.to_radians(), 1.0f32, 0.5, self.range);
+
+        (light_projection * view).to_cols_array_2d()
+    }
+
+    
     pub fn is_directional(&self) -> bool {
         self.light_type == 1
     }
@@ -108,3 +136,15 @@ impl Light {
         self.light_type == 0
     }
 }
+
+fn face_direction(face: usize) -> glam::Vec3 {
+        match face {
+            0 => glam::Vec3::X,
+            1 => glam::Vec3::NEG_X,
+            2 => glam::Vec3::Y,
+            3 => glam::Vec3::NEG_Y,
+            4 => glam::Vec3::Z,
+            5 => glam::Vec3::NEG_Z,
+            _ => panic!("Invalid face index"),
+        }
+    }   

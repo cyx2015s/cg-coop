@@ -78,11 +78,7 @@ fn main() {
 
                     ui.show_demo_window(&mut true);
 
-                    ui.window("操作说明")
-                        .size([300.0, 100.0], Condition::FirstUseEver)
-                        .build(|| {
-                            ui.text_wrapped("按K切换到实体\n按V键切换到飞行\n按B键环绕\n滚轮放大缩小视角\n按R恢复视角\n按P键截图\n按WS在摄像头方向前后移动\n按AD左右移动\n按Space/Ctrl上升下降");     
-                        });
+                    
 
                     scene.build_ui(ui);
 

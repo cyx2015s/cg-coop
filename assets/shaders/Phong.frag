@@ -13,8 +13,8 @@ uniform bool has_texture;
 uniform int cascadeCount;
 
 uniform sampler2DArray shadow_map;
-
-
+uniform sampler2DArray spot_shadow_map;
+uniform sampler2DArray point_shadow_map;
 
 struct Light {
     vec3 color;
@@ -58,6 +58,14 @@ layout(std140) uniform LightSpaceMatrix_Block {
     LightSpaceMatrix light_space_matrix[128];
 };
 
+layout(std140) uniform SpotLightMatrix_Block{
+    LightSpaceMatrix spot_light_space_matrix[32];
+};
+
+layout(std140) uniform PointLightMatrix_Block{
+    LightSpaceMatrix point_light_space_matrix[256];
+};
+
 vec3 getDiffuseColor() {
     if (has_texture) {
         return texture(diffuse_tex, v_tex_coord).rgb * material.kd; 
@@ -76,7 +84,7 @@ vec3 calcAmbientLight(Light l) {
 
 // 平行光计算，增加 shadow 参数
 vec3 calcDirectionalLight(Light l, int i, vec3 normal) {
-    vec4 fragPosViewSpace = view * vec4(v_position, 1.0);;
+    vec4 fragPosViewSpace = view * vec4(v_position, 1.0);
     float depthValue = abs(fragPosViewSpace.z);
     float shadow = 0.0;
 
@@ -118,30 +126,82 @@ vec3 calcDirectionalLight(Light l, int i, vec3 normal) {
     return l.intensity * ((1.0 - shadow) * (diffuse + spec));
 }
 
-vec3 calPointLight(Light l, vec3 normal) {
+vec3 calPointLight(Light l, vec3 normal, int i) {
     vec3 lightDir = normalize(l.position - v_position);
+    vec3 dir = -lightDir;
     vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * getDiffuseColor();
     float distance = length(v_position - l.position);
+
+    int face;
+
+    float ax = abs(dir.x);
+    float ay = abs(dir.y);
+    float az = abs(dir.z);
+
+    if ( ax >= ay && ax >= az ){
+        face = dir.x > 0.0f ? 0 : 1;
+    } else if ( ay >= az) {
+        face = dir.y > 0.0f ? 2 : 3;
+    } else {
+        face = dir.z > 0.0f ? 4 : 5;
+    }
+    float bias = max(0.05 * (1 - dot(normal, -l.direction)),0.005);
+    vec4 fPositionLightSpace = point_light_space_matrix[i * 6 + face].matrix * vec4(v_position, 1.0);
+    vec3 projCoords = fPositionLightSpace.xyz / fPositionLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    float currentDepth = distance / l.range;
+
+    vec2 texelSize = 1.0 / textureSize(point_shadow_map, 0).xy;
+    float shadow = 0.0;
+    for(int x = -2; x <= 2; ++x){
+        for(int y = -2; y <= 2; ++y){
+            float pcfDepth = texture(point_shadow_map, vec3(projCoords.xy + vec2(x, y) * texelSize, i * 6 + face)).r;
+            if(currentDepth - bias > pcfDepth){
+                shadow += 1.0;
+            }
+        }
+    }
+    shadow /= 25.0;
+
     float attenuation = 1.0f / (l.kfactor[0] + l.kfactor[1] * distance + l.kfactor[2] * distance * distance);
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 viewDir = normalize(viewPos - v_position);
     vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks;
-    return l.intensity * (diffuse + spec) * attenuation;
+    return l.intensity * (1 - shadow) * (diffuse + spec) * attenuation;
 }
 
-vec3 calSpotLight(Light l, vec3 normal) { 
+vec3 calSpotLight(Light l, vec3 normal, int i) { 
     vec3 lightDir = normalize(l.position - v_position);
+    float distance = length(v_position - l.position);
     float theta = acos(-dot(lightDir, normalize(l.direction)));
-    if (theta > l.angle) {
+    if (theta > l.angle || distance > l.range) {
         return vec3(0.0f);
     }
+    float bias = max(0.05 * (1 - dot(normal, lightDir)),0.005);
+    vec4 fPositionLightSpace = spot_light_space_matrix[i].matrix * vec4(v_position, 1.0);
+    vec3 projCoords = fPositionLightSpace.xyz / fPositionLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    float currentDepth = projCoords.z;
+    vec2 texelSize = 1.0 / textureSize(spot_shadow_map, 0).xy;
+    float shadow = 0.0;
+    for(int x = -2; x <= 2; ++x){
+        for(int y = -2; y <= 2; ++y){
+            float pcfDepth = texture(spot_shadow_map, vec3(projCoords.xy + vec2(x, y) * texelSize, i)).r;
+            if(currentDepth - bias > pcfDepth){
+                shadow += 1.0;
+            }
+        }
+    }
+    shadow /= 25.0;
+
     vec3 diffuse = l.color * max(dot(lightDir, normal), 0.0f) * getDiffuseColor();
-    float distance = length(v_position - l.position);
+    
     float attenuation = 1.0f / (l.kfactor[0] + l.kfactor[1] * distance + l.kfactor[2] * distance * distance);
     vec3 reflectDir = reflect(-lightDir, normal);
     vec3 viewDir = normalize(viewPos - v_position);
     vec3 spec = l.color * pow(max(dot(reflectDir, viewDir), 0.0f), material.ns) * material.ks;
-    return l.intensity * (diffuse + spec) * attenuation;
+    return l.intensity * (1 - shadow) * (diffuse + spec) * attenuation;
 }
 
 void main() {
@@ -152,8 +212,8 @@ void main() {
         switch (lights[i].light_type) {
             case 0: light_color += calcAmbientLight(lights[i]); break;
             case 1: light_color += calcDirectionalLight(lights[i], i, normal); break; 
-            case 2: light_color += calPointLight(lights[i], normal); break;
-            case 3: light_color += calSpotLight(lights[i], normal); break;
+            case 2: light_color += calPointLight(lights[i], normal, i); break;
+            case 3: light_color += calSpotLight(lights[i], normal, i); break;
         }
     }
     color = vec4(light_color, 1.0f);

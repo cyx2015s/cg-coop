@@ -6,14 +6,12 @@ use crate::core::math::transform::Transform;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
-use crate::physics::boundingbox::{AABB, BoundingBox, BoundingVolume};
+use crate::physics::boundingbox::{AABB ,BoundingVolume};
 use crate::physics::collision::board::collide;
 use crate::physics::collision::solve::{apply_gravity, solve_contact, stimulate_step};
-use crate::physics::rigid::{Contact, RigidBody};
-use crate::scene::world;
+use crate::physics::rigid::{RigidBody};
 
 use glutin::surface::WindowSurface;
-use std::default;
 use std::fmt::Debug;
 use std::time::Instant;
 
@@ -119,10 +117,16 @@ impl RigidBody for CameraObject {
     fn body_type(&self) -> BodyType { self.camera.physics.body_type }
     fn restitution(&self) -> f32 { self.camera.physics.restitution }
     fn bounding_volume(&self) -> BoundingVolume {
-        BoundingVolume::AABB( AABB {
-            min: glam::Vec3::new(-0.25, -0.85, -0.25),
-            max: glam::Vec3::new(0.25, 0.85, 0.25),
-        }.get_global_aabb(self.camera.transform.get_matrix()))
+        let h = self.camera.current_half_height;
+
+        let local_aabb = AABB {
+            min: glam::Vec3::new(-0.25, -h * 2.0, -0.25),
+            max: glam::Vec3::new( 0.25,  0.0,  0.25),
+        };
+
+        BoundingVolume::AABB(
+            local_aabb.get_global_aabb(self.camera.transform.get_matrix())
+        )
     }
 }
 
@@ -267,7 +271,21 @@ impl World {
             if self.objects[i].physics.collision { bodies.push(BodyHandle::Object(i)); }
         }
         if let Some(idx) = self.get_selected_camera() {
-            if self.cameras[idx].camera.physics.collision { bodies.push(BodyHandle::Camera(idx)); }
+            let camera = &mut self.cameras[idx].camera;
+            if camera.physics.collision { bodies.push(BodyHandle::Camera(idx)); }
+            let target = if camera.is_crouching {
+                camera.crouch_half_height
+            } else {
+                camera.stand_half_height
+            };
+
+            let speed = 6.0; // 下蹲/站起速度
+            let current_height = camera.current_half_height;
+            camera.current_half_height = lerp(
+                current_height,
+                target,
+                dt * speed,
+            );
         }
 
         for i in 0..bodies.len() {
@@ -1057,4 +1075,8 @@ fn is_dynamic(handle : BodyHandle, world: &mut World) -> bool {
         BodyHandle::Object(idx) => world.objects[idx].is_dynamic(),
         BodyHandle::Camera(idx) => world.cameras[idx].is_dynamic(),
     }
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t.clamp(0.0, 1.0)
 }
