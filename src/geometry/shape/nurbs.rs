@@ -1,7 +1,9 @@
-use imgui::Drag;
+use crate::core::vertex::Vertex;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::physics::boundingbox::{AABB, BoundingVolume};
 use crate::scene::world::EditableMesh;
+use glutin::surface::WindowSurface;
+use imgui::Drag;
 
 // B-Spline 基函数
 fn b_spline_basis(i: usize, k: usize, t: f32, knots: &[f32]) -> f32 {
@@ -54,7 +56,7 @@ pub struct NurbsSurface {
     pub degree: usize,
     pub splits: usize,
     pub selected_point_idx: usize,
-    pub u_knots: Vec<f32>, 
+    pub u_knots: Vec<f32>,
     pub v_knots: Vec<f32>,
 }
 
@@ -109,7 +111,7 @@ impl AsMesh for NurbsSurface {
                         rational_weight += nip * w;
                     }
                 }
-                
+
                 // 透视除法
                 if rational_weight.abs() > 1e-6 {
                     point[0] /= rational_weight;
@@ -167,7 +169,9 @@ impl AsMesh for NurbsSurface {
         for n in &mut normals {
             let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
             if len > 1e-6 {
-                n[0] /= len; n[1] /= len; n[2] /= len;
+                n[0] /= len;
+                n[1] /= len;
+                n[2] /= len;
             } else {
                 *n = [0.0, 1.0, 0.0];
             }
@@ -188,8 +192,12 @@ impl EditableMesh for NurbsSurface {
         let mut changed = false;
         ui.text("NURBS 曲面参数");
 
-        ui.text(format!("U节点数: {}, V节点数: {}", self.u_knots.len(), self.v_knots.len()));
-        
+        ui.text(format!(
+            "U节点数: {}, V节点数: {}",
+            self.u_knots.len(),
+            self.v_knots.len()
+        ));
+
         ui.slider(
             "控制点索引",
             0,
@@ -208,5 +216,28 @@ impl EditableMesh for NurbsSurface {
             changed |= Drag::new("权重").range(0.1, 100.0).speed(0.01).build(ui, w);
         }
         changed
+    }
+
+    fn debug_vbo(
+        &self,
+        f: &glium::Display<WindowSurface>,
+    ) -> Option<(glium::VertexBuffer<Vertex>, usize)> {
+        use crate::core::vertex::Vertex;
+        use glium::VertexBuffer;
+
+        let vertex_data: Vec<Vertex> = self
+            .control_points
+            .iter()
+            .map(|v| Vertex {
+                position: *v,
+                tex_coord: [0.0; 2],
+                normal: [0.0; 3],
+            })
+            .collect();
+
+        Some((
+            VertexBuffer::new(f, &vertex_data).unwrap(),
+            self.selected_point_idx,
+        ))
     }
 }

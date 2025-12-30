@@ -112,6 +112,4 @@ impl EditableMesh for Cone {
             .build(ui, &mut self.sectors);
         changed
     }
-
-    fn debug_ui(&mut self, _ui: &imgui::Ui) {}
 }

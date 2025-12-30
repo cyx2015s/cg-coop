@@ -3,6 +3,7 @@ use super::light::Light;
 
 use crate::core::material::Material;
 use crate::core::math::transform::Transform;
+use crate::core::vertex::Vertex;
 use crate::geometry::shape::mesh::{AsMesh, Mesh};
 use crate::geometry::shape::nurbs::NurbsSurface;
 use crate::geometry::shape::{cone::Cone, cube::Cube, cylinder::Cylinder, sphere::Sphere};
@@ -80,7 +81,7 @@ pub struct RenderProperties {
 
 pub trait EditableMesh: AsMesh {
     fn ui(&mut self, ui: &imgui::Ui) -> bool { false }
-    fn debug_ui(&mut self, _ui: &imgui::Ui) {}
+    fn debug_vbo(&self, f: &glium::Display<WindowSurface>) -> Option<(glium::VertexBuffer<Vertex>, usize)> {None}
 }
 
 pub struct GameObject {
