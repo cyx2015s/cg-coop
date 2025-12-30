@@ -413,6 +413,10 @@ impl UIHandle for World {
                 }
             }
 
+            if camera.move_state == camera::MoveState::PanObit {
+                camera.update_pan_obit(delta_time);
+            }
+
             if ui.is_mouse_clicked(imgui::MouseButton::Left)
                 && !ui.is_any_item_focused()
                 && !ui.is_any_item_hovered()
@@ -433,9 +437,24 @@ impl UIHandle for World {
                 mouse_click_far = Some(world_far);
                 mouse_click_near = Some(world_near);
             }
-
-            if camera.move_state == camera::MoveState::PanObit {
-                camera.update_pan_obit(delta_time);
+            if let Some(origin) = mouse_click_near {
+                if let Some(target) = mouse_click_far {
+                    let dir = (target - origin).normalize();
+                    self.get_selected_mut().map(|obj| {
+                        if let Some((pt, costheta)) = obj.mesh.compute_closest_point(origin.to_array(), dir.to_array())
+                        {
+                        if costheta /* cos theta */ < 0.95 {
+                            obj.rendering.selected_vertex_index = None;
+                        } else {
+                            for (i, v) in obj.mesh.vertices.iter().enumerate() {
+                                if v == pt.as_ref() {
+                                    obj.rendering.selected_vertex_index = Some(i);
+                                    break;
+                                }
+                            }
+                        }}
+                    });
+                }
             }
         }
     }

@@ -1,5 +1,8 @@
-use crate::scene::world::{BodyType, GameObject};
+use std::any::{Any, TypeId};
+
+use crate::scene::world::{BodyType, EditableMesh, GameObject};
 use crate::ui::UIBuild;
+use gltf::Mesh;
 use imgui::{Condition, Drag};
 
 impl UIBuild for GameObject {
@@ -30,100 +33,27 @@ impl UIBuild for GameObject {
                 ui.separator();
 
                 let need_regen = self.shape.ui(ui);
-                // match &mut self.kind {
-                //     ShapeKind::Cube { width, height, depth } => {
-                //         if Drag::new("宽").speed(0.1).build(ui, width) { need_regen = true; }
-                //         if Drag::new("高").speed(0.1).build(ui, height) { need_regen = true; }
-                //         if Drag::new("深").speed(0.1).build(ui, depth) { need_regen = true; }
-                //     },
-                //     ShapeKind::Sphere { radius, sectors } => {
-                //         if Drag::new("半径").speed(0.05).build(ui, radius) { need_regen = true; }
-                //         let mut s = *sectors as i32;
-                //         if ui.slider( "精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
-                //     },
-                //     ShapeKind::Cylinder { top_radius, bottom_radius, height, sectors } => {
-                //         if Drag::new("顶半径").speed(0.05).build(ui, top_radius) { need_regen = true; }
-                //         if Drag::new("底半径").speed(0.05).build(ui, bottom_radius) { need_regen = true; }
-                //         if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
-                //         let mut s = *sectors as i32;
-                //         if ui.slider( "精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
-                //     },
-                //     ShapeKind::Cone { radius, height, sectors } => {
-                //         if Drag::new("底半径").speed(0.05).build(ui, radius) { need_regen = true; }
-                //         if Drag::new("高度").speed(0.1).build(ui, height) { need_regen = true; }
-                //         let mut s = *sectors as i32;
-                //         if ui.slider( "精度", 3, 64, &mut s) { *sectors = s as u16; need_regen = true; }
-                //     },
-                //     ShapeKind::Nurbs { control_points, weights, current_nurbs_idx, .. } => {
-                //         ui.text("NURBS 控制点编辑");
-
-                //         // 确保 idx 一定存在（没有就初始化为 0）
-                //         let idx = current_nurbs_idx;
-
-                //         // ImGui Slider 直接绑定 usize
-                //         ui.slider( "点索引", 0, control_points.len().saturating_sub(1), idx);
-
-                //         if *idx < control_points.len() {
-                //             ui.text_colored([1.0, 1.0, 0.0, 1.0], "编辑中...");
-
-                //             if Drag::new("X")
-                //                 .speed(0.05)
-                //                 .build(ui, &mut control_points[*idx][0])
-                //             {
-                //                 need_regen = true;
-                //             }
-
-                //             if Drag::new("Y")
-                //                 .speed(0.05)
-                //                 .build(ui, &mut control_points[*idx][1])
-                //             {
-                //                 need_regen = true;
-                //             }
-
-                //             if Drag::new("Z")
-                //                 .speed(0.05)
-                //                 .build(ui, &mut control_points[*idx][2])
-                //             {
-                //                 need_regen = true;
-                //             }
-
-                //             if Drag::new("权重")
-                //                 .speed(0.05)
-                //                 .range(0.1, 100.0)
-                //                 .build(ui, &mut weights[*idx])
-                //             {
-                //                 need_regen = true;
-                //             }
-                //         }
-                //     }
-
-                //     _ => {}
-                // }
 
                 if need_regen {
                     self.regenerate_mesh();
                 }
 
                 // if self.kind != ShapeKind::Imported {
-                //     if ui.button("网格化（不可逆！）") {
-                //         *self = GameObject {
-                //             name: self.name.clone() + " (Meshed)",
-                //             transform: self.transform.clone(),
-                //             material: self.material,
-                //             mesh: self.mesh.clone(),
-                //             body_type: self.body_type,
-                //             velocity: self.velocity,
-                //             restitution: self.restitution,
-                //             kind: ShapeKind::Imported,
-                //             visible: self.visible,
-                //             use_texture: self.use_texture,
-                //             selected_vertex_index: None,
-                //         }
 
-                //     }
-                // }  else {
-                //     ui.text("模型已网格化，只能编辑顶点位置和UV映射。");
-                // }
+                if self.shape.intermediate_mesh()
+                    && ui.button("网格化（不可逆！）")
+                {
+                    *self = GameObject {
+                        name: self.name.clone() + " (Meshed)",
+                        shape: Box::new(self.mesh.clone()),
+                        mesh: self.mesh.clone(),
+                        rendering: self.rendering.clone(),
+                        physics: self.physics.clone(),
+                        transform: self.transform.clone(),
+                        behavior: self.behavior.clone(),
+                    };
+                }
+
                 match self.rendering.selected_vertex_index {
                     Some(idx) => {
                         ui.text_colored([1.0, 1.0, 0.0, 1.0], format!("编辑顶点 {}", idx));

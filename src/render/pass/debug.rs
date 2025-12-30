@@ -66,44 +66,43 @@ impl DebugPass {
                     .unwrap();
             }
 
-            // if let ShapeKind::Imported {} = &obj.kind
-            //     && let Some(selected) = obj.selected_vertex_index
-            // {
-            //     let debug_vertex = obj.mesh.vertices[selected];
-            //     let obj_matrix = obj.transform.get_matrix();
+            if !obj.shape.intermediate_mesh() && let Some(selected) = obj.rendering.selected_vertex_index
+            {
+                let debug_vertex = obj.mesh.vertices[selected];
+                let obj_matrix = obj.transform.get_matrix();
 
-            //     let uniforms = uniform! {
-            //         model: obj_matrix.to_cols_array_2d(),
-            //         view: view,
-            //         projection: perspective.to_cols_array_2d(),
-            //         selected_idx: 0,
-            //     };
-            //     let params = glium::DrawParameters {
-            //         depth: glium::Depth {
-            //             test: glium::draw_parameters::DepthTest::Overwrite,
-            //             write: false,
-            //             ..Default::default()
-            //         },
-            //         point_size: Some(10.0),
-            //         ..Default::default()
-            //     };
-            //     let vertex_data: Vec<Vertex> = vec![Vertex {
-            //         position: debug_vertex,
-            //         tex_coord: [0.0; 2],
-            //         normal: [0.0; 3],
-            //     }];
-            //     let debug_vbo = glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap();
-            //     target
-            //         .draw(
-            //             &debug_vbo,
-            //             &glium::index::NoIndices(glium::index::PrimitiveType::Points),
-            //             &self.program,
-            //             &uniforms,
-            //             &params,
-            //         )
-            //         .unwrap();
-            //    // println!("Selected vertex position: {:?}", debug_vertex);
-            // }
+                let uniforms = uniform! {
+                    model: obj_matrix.to_cols_array_2d(),
+                    view: view.to_cols_array_2d(),
+                    projection: perspective.to_cols_array_2d(),
+                    selected_idx: 0,
+                };
+                let params = glium::DrawParameters {
+                    depth: glium::Depth {
+                        test: glium::draw_parameters::DepthTest::Overwrite,
+                        write: false,
+                        ..Default::default()
+                    },
+                    point_size: Some(10.0),
+                    ..Default::default()
+                };
+                let vertex_data: Vec<Vertex> = vec![Vertex {
+                    position: debug_vertex,
+                    tex_coord: [0.0; 2],
+                    normal: [0.0; 3],
+                }];
+                let debug_vbo = glium::vertex::VertexBuffer::new(display, &vertex_data).unwrap();
+                target
+                    .draw(
+                        &debug_vbo,
+                        &glium::index::NoIndices(glium::index::PrimitiveType::Points),
+                        &self.program,
+                        &uniforms,
+                        &params,
+                    )
+                    .unwrap();
+               // println!("Selected vertex position: {:?}", debug_vertex);
+            }
         }
     }
 }

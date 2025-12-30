@@ -29,6 +29,9 @@ impl EditableMesh for Mesh {
         ui.text("网格模型编辑能力受限。请在外部 3D 软件中修改后重新导入。");
         false
     }
+    fn intermediate_mesh(&self) -> bool {
+        false
+    }
 }
 
 impl Mesh {
